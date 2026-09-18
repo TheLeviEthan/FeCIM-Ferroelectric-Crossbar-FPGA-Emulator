@@ -1,0 +1,37 @@
+# Quartus
+db/
+incremental_db/
+simulation/
+greybox_tmp/
+hc_output/
+*.qws
+*.rpt.bak
+output_files/*
+!output_files/*.sof
+!output_files/*.rpt
+
+# Verilator / C++
+obj_dir/
+build/
+*.o
+*.a
+*.vcd
+*.fst
+
+# Python
+__pycache__/
+*.egg-info/
+.pytest_cache/
+dist/
+build/
+.venv/
+
+# Data (fetch by script, never commit)
+results/raw/
+sw/fecim/datasets/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
