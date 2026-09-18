@@ -1,0 +1,4 @@
+﻿# model/include
+
+Public headers.
+
