@@ -1,8 +1,12 @@
 # FeCIM Host Protocol
 
-**Version:** 2
+**Version:** 3
 **Status:** FROZEN as of week 1. Changes require agreement from all four members and a
 version bump.
+
+**Rev 3 closes the six decisions left open in rev 2.** Changes: `TGT_ATTEN` bulk target
+added (rev 2 had no mechanism for writing IR-drop coefficients), reserved register range
+defined, unimplemented-address and read-only-write behaviour specified.
 
 This document is the contract between the host (Lane D) and the board (Lane A). It defines
 what bytes cross the wire and what they mean. It says nothing about how either side is
@@ -83,6 +87,7 @@ the payload.
 |---|---|---|---|
 | `0x01` | `WRITE_WEIGHTS` | `[addr:2][data:N]` | — |
 | `0x02` | `WRITE_ACT` | `[addr:2][data:N]` | — |
+| `0x09` | `WRITE_ATTEN` | `[addr:2][data:N]` | — |
 | `0x03` | `SET_CONFIG` | `[reg:1][value:4]` | — |
 | `0x04` | `COMPUTE` | — | — |
 | `0x05` | `READ_RESULT` | `[start:2][count:2]` | `count × 4` bytes |
@@ -102,10 +107,24 @@ and the correct values overwrite the corrupt ones. Chunking bounds the cost of a
 
 A full 128×128 tile is 16,384 bytes in 64 chunks.
 
+Bulk targets are `0` weights, `1` activations, `2` attenuation coefficients.
+
 ### 4.2 `WRITE_ACT`
 
 `addr` is the row index, values are `uint8`. The host always writes the full vector for the
 configured row count; partial writes leave stale entries.
+
+### 4.2b `WRITE_ATTEN`
+
+IR-drop attenuation coefficients, one `uint8` per row, Q0.8 — `256` would be unity gain so
+the maximum is `255` (0.996). `addr` is the row index.
+
+**Rev 2 had no mechanism for this.** `atten_rom` needs `TILE_ROWS` coefficients and a
+32-bit config register cannot carry a table, so this reuses the existing bulk streaming
+path as a third target rather than adding an indexed register pair.
+
+Reset default is all `255`, i.e. effectively no attenuation. The host need not write this
+unless `NOISE_EN[4]` is set.
 
 ### 4.3 `COMPUTE`
 
@@ -195,6 +214,15 @@ All registers are 32 bits, accessed by index via `SET_CONFIG` and `GET_CONFIG`.
 | `0x0A` | `STATUS` | R | — | See §6.4 |
 | `0x0B` | `CYCLE_CNT` | R | — | Cycles taken by the last `COMPUTE` |
 | `0x0C` | `QUANT_MULT` | RW | — | `round(255·256/(N−1))`, Q8.8 |
+| `0x10`–`0x1F` | *reserved* | — | — | Semester 2: retention factor, per-column gain/offset, differential-pair enable, independent seeds |
+
+### 6.0 Access policy
+
+- **Unimplemented address**, either command: `ST_ADDR_RANGE`. Not a silent zero — the error
+  is what makes a typo in a register constant findable.
+- **`SET_CONFIG` to a read-only register** (`STATUS`, `CYCLE_CNT`): `ST_ADDR_RANGE`.
+- **Reserved addresses `0x10`–`0x1F`** behave as unimplemented until assigned. Adding one
+  later does not require a version bump, since no earlier host used it.
 
 ### 6.1 Reset is an ideal crossbar
 
@@ -220,6 +248,16 @@ weight LSBs:
 
 Converting a device measurement to LSB: `σ_LSB = 255 × σ_Vth / MW`, where `MW` is the
 memory window in volts. Derivation in `docs/device-model.md`.
+
+### 6.3b `active_cols` need not be a multiple of `NUM_LANES`
+
+The sequencer rounds the pass count up and drains full lane groups; the argmax unit masks
+columns at or beyond `active_cols`. The host reads only real columns, so a value of 48 with
+64 lanes is legal and behaves correctly.
+
+Weight and activation **addressing always uses the physical stride** — `TILE_ROWS` for
+weights — regardless of `TILE_CFG`. A 48-row configuration uses addresses 0–47 of each
+128-entry region and leaves the rest unread.
 
 ### 6.4 `STATUS` layout
 

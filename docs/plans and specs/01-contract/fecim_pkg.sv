@@ -4,6 +4,7 @@
 // Shared parameters, types, and protocol encodings for the FeCIM crossbar
 // emulator. Every RTL module and every testbench imports this package.
 //
+// Rev 3 -- adds TGT_ATTEN, CMD_WRITE_ATTEN, ACC_USED_W. See docs/consistency-audit.md.
 // Rev 2 -- corrected against DE10-Lite User Manual v1.6 and the MAX 10
 //          Embedded Multipliers User Guide. See docs/hardware-verification.md.
 //
@@ -66,12 +67,22 @@ package fecim_pkg;
     // Raising this to +/-255 pushes w_n to 10 bits and doubles MAC block cost.
     parameter int NOISE_CLAMP     = 127;
 
+    // Capped at 255, not 256, so (u * QUANT_LEVELS) stays a 9x9 multiply.
+    parameter int QUANT_LEVELS_MAX = 255;
+
     // Worst-case accumulator magnitude:
     //   254 (max |w_n|) x 255 (max act) x 128 (rows) = 8,290,560 -> 24 bits.
     // That fits 24-bit signed by 1.2%, which is too thin to rely on, and it
     // fails outright at 256 rows. ACC_W stays 32; the result buffer M9K runs
     // natively in 256x32 mode, so the extra width is free there.
     parameter int ACC_MAX_MAG     = 254 * 255 * TILE_ROWS;
+
+    // Bits the accumulator actually USES, as distinct from ACC_W which is the
+    // container width. The ADC must quantize over this range -- using ACC_W
+    // would place full scale at +/-2^31, a range the signal never approaches,
+    // collapsing every result into one or two codes.
+    //   adc_shift = ACC_USED_W - adc_bits
+    parameter int ACC_USED_W      = $clog2(ACC_MAX_MAG) + 1;   // 24 at 128 rows
 
     //-------------------------------------------------------------------------
     // Lane pipeline depth: address issue -> accumulator final.
@@ -123,7 +134,8 @@ package fecim_pkg;
         CMD_READ_RESULT   = 8'h05,
         CMD_IDENTIFY      = 8'h06,
         CMD_GET_CONFIG    = 8'h07,
-        CMD_READ_ARGMAX   = 8'h08
+        CMD_READ_ARGMAX   = 8'h08,
+        CMD_WRITE_ATTEN   = 8'h09
     } cmd_e;
 
     typedef enum logic [7:0] {
@@ -137,7 +149,8 @@ package fecim_pkg;
 
     typedef enum logic [1:0] {
         TGT_WEIGHTS = 2'd0,
-        TGT_ACT     = 2'd1
+        TGT_ACT     = 2'd1,
+        TGT_ATTEN   = 2'd2      // IR-drop coefficients, Q0.8, one per row
     } bulk_target_e;
 
     //-------------------------------------------------------------------------
@@ -187,6 +200,7 @@ package fecim_pkg;
         REG_STATUS       = 8'h0A,
         REG_CYCLE_CNT    = 8'h0B,
         REG_QUANT_MULT   = 8'h0C    // Q8.8: round(255*256/(N-1)), 16 bits
+        // 0x10-0x1F reserved for semester 2 -- see docs/protocol.md section 6.0
     } cfg_addr_e;
 
     //-------------------------------------------------------------------------
@@ -277,6 +291,10 @@ package fecim_pkg;
             else $fatal(1, "accumulator can overflow at this geometry");
         assert (NUM_LANES <= DEV_M9K - 2)
             else $fatal(1, "not enough M9K for one per lane plus act and result buffers");
+        assert (ACC_USED_W <= ACC_W)
+            else $fatal(1, "ACC_USED_W exceeds container width ACC_W");
+        assert (QUANT_LEVELS_MAX <= 255)
+            else $fatal(1, "QUANT_LEVELS > 255 pushes the quantize multiply past 9 bits");
     end
     // synthesis translate_on
 
