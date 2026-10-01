@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Verilator
+        run: sudo apt-get update && sudo apt-get install -y verilator
+      - name: Lint RTL
+        run: |
+          verilator --lint-only -Wall --top-module fecim_top \
+            rtl/fecim_pkg.sv $(find rtl -name '*.sv' -not -name 'fecim_pkg.sv')
+
+  model:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure and build model
+        run: cmake -S model -B build && cmake --build build
+      - name: Run model tests
+        run: ./build/model_tests
+
+  cosim:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Verilator
+        run: sudo apt-get update && sudo apt-get install -y verilator
+      - name: Build co-simulation harness
+        run: make -C model/cosim
+      - name: Run L0 bit-exact gate
+        run: ./model/cosim/run_l0
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install package and test dependencies
+        run: pip install -e './sw[test]'
+      - name: Run Python tests
+        run: pytest sw/tests
