@@ -115,3 +115,14 @@ TEST(bounds_checked) {
     bad.quant_levels = 256;
     CHECK_THROWS(m.set_config(bad), std::invalid_argument);
 }
+
+TEST(config_reset_defaults_match_protocol) {
+    // protocol.md §6: the reset state is an ideal crossbar with a consistent
+    // QUANT_LEVELS/QUANT_MULT pair and a lossless ADC setting.
+    const Config c;
+    CHECK_EQ(c.quant_levels, 255);
+    CHECK_EQ(int{c.quant_mult}, (255 * 256 + (c.quant_levels - 1) / 2) / (c.quant_levels - 1));
+    CHECK_EQ(c.adc_bits, ACC_USED_W);
+    CHECK_EQ(int{c.noise_en}, int{NOISE_NONE});
+    CHECK_EQ(c.noise_seed, 0u);
+}

@@ -84,7 +84,7 @@ module fecim_top
     logic [15:0]           active_rows, active_cols;
     logic [7:0]            quant_levels;
     logic [15:0]           quant_mult;
-    logic [15:0]           d2d_sigma;
+    logic [SIGMA_W-1:0]    d2d_sigma;
     logic [SIGMA_W-1:0]    read_sigma;
     logic [31:0]           noise_seed;
     noise_en_t             noise_en;

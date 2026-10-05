@@ -65,13 +65,13 @@ Then `w_n = w(±127) + noise(±127) = ±254`, which is **9 bits signed**. With `
 zero-extended to 9-bit signed, the MAC becomes a 9×9 signed multiply — two per block.
 
 The clamp is still absurdly generous. At maximum sigma the noise standard deviation is
-about 57% of full weight scale; realistic read noise is a few percent.
+about 29% of full weight scale (36.8 LSB); realistic read noise is a few percent.
 
 **Change 2 — narrow the noise-scaling multiply to 9×9.**
 
 ```systemverilog
 logic signed [8:0]  ih9;        // was 11-bit ih_centered
-logic signed [8:0]  sigma9;     // was 16-bit read_sigma, now Q1.8
+logic signed [8:0]  sigma9;     // was 16-bit read_sigma; now {1'b0, READ_SIGMA[7:0]}
 logic signed [17:0] scaled;
 
 assign ih9    = ih_centered >>> 1;              // ±510 → ±255
@@ -79,8 +79,10 @@ assign scaled = (ih9 * sigma9) >>> 9;           // → ±127
 ```
 
 Halving `ih_centered` is a pure scale change absorbed into sigma; no distribution is lost.
-`sigma9` as Q1.8 spans 0 to 0.996 with a resolution of 1/256, which gives noise-σ
-granularity of about 0.29 LSB — finer than any sweep needs.
+**Correction (consistency audit F3):** this section originally called `sigma9` Q1.8. With
+the `>>> 9` shift the effective scale is `READ_SIGMA / 512` — 0 to 0.498 in steps of 1/512,
+noise σ = 0.144 × `READ_SIGMA` LSB, 36.8 LSB at maximum. The shift is normative; see
+`protocol.md` §6.3. (`D2D_SIGMA` shifts by 8 instead, so its scale is `reg / 256`.)
 
 **Change 3 — the cell hash must use 16-bit arithmetic.**
 
@@ -206,7 +208,7 @@ all four team members build identically.
 | `control-fsm-spec.md` | §8: HEX is active-low and 8 bits wide; no RTL debounce needed; add `QUANT_MULT` Q8.8 to register map |
 | `write-path-spec.md` | §5 hash uses 16×16 rounds; D2D becomes Irwin–Hall n = 2 (triangular); §4.1 `QUANT_MULT` redefined as Q8.8; §8 resource table corrected |
 | `activation-buffer-spec.md` | §8 resource table only |
-| `mac-array-spec.md` | §4.3 noise clamp ±127; `w_n` is 9-bit; `sigma9` is Q1.8; §5 multiply is 9×9; §10 resource table corrected; add the shared-signedness constraint from §2.4 |
+| `mac-array-spec.md` | §4.3 noise clamp ±127; `w_n` is 9-bit; `sigma9` is `{1'b0, READ_SIGMA[7:0]}`, scale /512 (not Q1.8 — audit F3); §5 multiply is 9×9; §10 resource table corrected; add the shared-signedness constraint from §2.4 |
 | `result-buffer-spec.md` | No change |
 | `model-verification-design.md` | `model_exact` must mirror the ±127 clamp, the `>>> 9` shift, and the 16-bit hash. Add a corner case for `adc_bits` at the new widths. |
 | `fecim-plan-v2.md` | §2.3 resource table: multipliers are 50% at 64 lanes, not 47% of a wrong denominator |

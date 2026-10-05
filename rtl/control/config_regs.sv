@@ -45,8 +45,8 @@ module config_regs
     output logic [15:0]         active_cols,
     output logic [7:0]          quant_levels,
     output logic [15:0]         quant_mult,      // Q8.8
-    output logic [15:0]         d2d_sigma,
-    output logic [SIGMA_W-1:0]  read_sigma,      // Q1.8
+    output logic [SIGMA_W-1:0]  d2d_sigma,       // {1'b0, D2D_SIGMA[7:0]},  scale /256
+    output logic [SIGMA_W-1:0]  read_sigma,      // {1'b0, READ_SIGMA[7:0]}, scale /512
     output logic [31:0]         noise_seed,
     output noise_en_t           noise_en,
     output logic [4:0]          adc_bits,
@@ -54,7 +54,8 @@ module config_regs
     output logic [BAUD_ACC_W-1:0] baud_inc
 );
 
-    // Reset defaults: ideal crossbar, full tile, 115200 baud.
+    // Reset defaults (protocol.md §6): ideal crossbar, full tile, 115200 baud,
+    // QUANT_LEVELS/QUANT_MULT = 255/257 (a consistent pair), ADC_BITS = ACC_USED_W.
     assign cfg_rdata     = '0;
     assign soft_reset    = 1'b0;
     assign clear_results = 1'b0;
@@ -62,7 +63,7 @@ module config_regs
     assign active_rows   = 16'(TILE_ROWS);
     assign active_cols   = 16'(TILE_COLS);
     assign quant_levels  = 8'(QUANT_LEVELS_MAX);
-    assign quant_mult    = '0;
+    assign quant_mult    = 16'd257;
     assign d2d_sigma     = '0;
     assign read_sigma    = '0;
     assign noise_seed    = '0;
