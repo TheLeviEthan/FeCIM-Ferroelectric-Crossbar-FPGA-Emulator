@@ -28,7 +28,7 @@ inline constexpr int WEIGHT_W        = 8;     // signed, +/-127
 inline constexpr int ACT_W           = 8;     // unsigned, 0..255
 inline constexpr int NOISE_W         = 8;
 inline constexpr int W_N_W           = 9;
-inline constexpr int SIGMA_W         = 9;     // Q1.8
+inline constexpr int SIGMA_W         = 9;     // {0, reg[7:0]} signed-positive operand
 inline constexpr int PROD_W          = 18;
 inline constexpr int ACC_W           = 32;
 

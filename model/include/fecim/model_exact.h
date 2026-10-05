@@ -24,11 +24,12 @@ struct Config {
     int           active_rows  = TILE_ROWS;
     int           active_cols  = TILE_COLS;
     int           quant_levels = QUANT_LEVELS_MAX;
-    std::uint16_t d2d_sigma    = 0;
-    std::uint16_t read_sigma   = 0;     // Q1.8, 9 bits used
-    std::uint32_t noise_seed   = 0;
+    std::uint16_t quant_mult   = 257;   // round(255*256/(N-1)); reset pairs with N = 255
+    std::uint8_t  d2d_sigma    = 0;     // scale /256 (>>> 8). Not Q1.8
+    std::uint8_t  read_sigma   = 0;     // scale /512 (>>> 9). Not Q1.8
+    std::uint32_t noise_seed   = 0;     // 0 is valid, no remap
     std::uint8_t  noise_en     = NOISE_NONE;
-    int           adc_bits     = ACC_USED_W;
+    int           adc_bits     = ACC_USED_W;  // >= ACC_USED_W is a no-op
     std::uint32_t stuck_rate   = 0;
 };
 

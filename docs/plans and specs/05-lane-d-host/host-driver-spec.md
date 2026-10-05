@@ -206,6 +206,7 @@ xbar.set_variation(sigma_lsb=12.8)
 xbar.set_read_noise(sigma_lsb=3.0)
 xbar.set_faults(rate=0.01, mode="zero")
 xbar.set_adc(bits=6)
+xbar.set_ir_drop(kappa=0.05)            # or set_ir_drop(coeffs=alpha_per_row)
 xbar.enable(["quant", "d2d", "read"])
 xbar.seed(0xACE1)
 
@@ -235,7 +236,8 @@ xbar.set_variation(sigma_vth_mv=50, memory_window_v=1.0)
 Both forms should exist. The register-unit escape hatch stays available as
 `set_config()` for debugging, but nothing in the documented workflow uses it.
 
-**Range-check and warn.** `D2D_SIGMA` saturates at 255, which is σ ≈ 104 LSB. Silently
+**Range-check and warn.** Both sigma registers use 8 bits (protocol §6.3): `D2D_SIGMA` tops out
+at 255, σ ≈ 104 LSB, and `READ_SIGMA` at 255, σ ≈ 36.8 LSB. The two scale factors differ. Silently
 clamping a requested value produces a sweep that flattens at the top for no visible reason.
 
 ### 6.2 Dependent registers are written together
@@ -268,6 +270,19 @@ gets transposed when written as a literal, and the failure is silent.
 `set_adc(bits=6)` computes `shift = ACC_USED_W - bits` using `ACC_USED_W` derived at
 connect. Reject `bits` outside 4…`ACC_USED_W`, and note that `bits == ACC_USED_W` is an
 exact no-op — useful as a sanity check.
+
+### 6.5 IR drop
+
+`set_ir_drop(coeffs)` takes one attenuation factor α per row in (0, 1] and writes
+`min(255, round(256·α))` through `WRITE_ATTEN` (protocol §4.2b) — a 128-byte bulk write, not
+128 register writes. `set_ir_drop(kappa=...)` is a convenience that builds the first-order
+profile `α_i = 1 − κ·i/M` from `cell-physics-derivation.md` §4.5. Writing coefficients does
+not enable the effect; `enable(["ir"])` does. `SimBackend` must keep the same per-row table.
+
+### 6.6 Seeds
+
+`seed(n)` writes `NOISE_SEED` and then pulses `CTRL[2]` so the LFSRs reload. 0 is a valid seed
+and is not remapped (protocol §6.6); neither backend may special-case it.
 
 ---
 

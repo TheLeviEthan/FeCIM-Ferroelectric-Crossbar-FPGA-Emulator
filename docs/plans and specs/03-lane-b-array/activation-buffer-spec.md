@@ -12,7 +12,7 @@
 ## 1. Purpose and scope
 
 Holds the input vector `a[0..R-1]`. During `COMPUTE` the sequencer reads one element per
-cycle and broadcasts it to all 32 lanes simultaneously.
+cycle and broadcasts it to all `NUM_LANES` lanes simultaneously (32 at the week-6 MVP, 64 at full size).
 
 Small module, three real design questions: what it is made of, how it stays aligned with
 the weight read, and whether it should hold more than one vector.
@@ -101,7 +101,7 @@ is a one-line change with no other edits. This is precisely why the constant liv
 
 ## 5. Broadcast fanout
 
-The activation output drives all 32 lanes — 8 bits × 32 loads on a net that spans the
+The activation output drives all 32 lanes (MVP; 64 at full size) — 8 bits × 32 loads on a net that spans the
 array physically. Register it and let Quartus duplicate the register during fitting; the
 tool handles this well when the source is a plain register with high fanout.
 
@@ -124,9 +124,26 @@ If `active_rows` is reduced mid-session, entries above the new limit are never r
 stale values are harmless. If it is later increased without a fresh `WRITE_ACT`, stale
 values from an older vector are silently included.
 
-Two defenses, use both: `CTRL[1]` zeroes the activation buffer, and the Python driver
-always writes the full vector for the configured row count. The driver-side rule is the
-one that actually matters; the hardware bit is for interactive debugging.
+The defense is driver-side: the Python driver always writes the full vector for the
+configured row count (protocol §4.2). **`CTRL[1]` clears results, not activations**
+(protocol §6), so there is no hardware clear for this buffer. If interactive debugging needs
+one, assign it a currently unused `CTRL` bit through the protocol change process rather than
+overloading `CTRL[1]`.
+
+### 6.2 IR-drop attenuation coefficients (`TGT_ATTEN`)
+
+`mac-array-spec.md` §8 moves the IR-drop multiply out of the lanes and into this module's
+broadcast path: `act_atten = noise_en.ir ? (act_raw * atten_rom[row]) >> 8 : act_raw`, one
+shared 9×9 multiply.
+
+`atten_rom` is `TILE_ROWS` × 8 bits, Q0.8, written by `WRITE_ATTEN` (`0x09`) as bulk target
+`TGT_ATTEN = 2`, with `bulk_addr` as the row index (protocol §4.2b). It resets to all `255`.
+`act_raw` is unsigned, so the multiply is still signed × signed with both operands
+zero-extended, as the shared-signedness rule requires.
+
+The attenuation must sit inside the existing activation-path stage so `LANE_PIPE_DEPTH` is
+unchanged. If it fails timing there, add a register on the activation **and** weight paths
+together and raise `LANE_PIPE_DEPTH`; a stage on one path only misaligns every row.
 
 ---
 
@@ -175,8 +192,9 @@ Not worth it. Keep the activation buffer as a single vector.
 
 ### 7.3 The actual recommendation
 
-Add a `READ_ARGMAX` command returning the index of the largest accumulator — one byte
-instead of 192. On-chip argmax is a 24-bit comparator and an index register in the drain
+Add a `READ_ARGMAX` command returning the index of the largest accumulator — 10 bytes
+(index, winner, runner-up) instead of a full readout. *Adopted as `0x08`; see
+`result-buffer-spec.md` §6 and protocol §4.6.* On-chip argmax is a 32-bit comparator and an index register in the drain
 shift chain, roughly 60 LEs, since the results already stream past one per cycle during
 `DRAIN`.
 

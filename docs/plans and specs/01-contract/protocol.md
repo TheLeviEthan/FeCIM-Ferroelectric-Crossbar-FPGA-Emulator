@@ -1,12 +1,19 @@
 # FeCIM Host Protocol
 
-**Version:** 3
+**Version:** 3.1 (document) · wire protocol version `0x02`, reported by `IDENTIFY` (§8)
 **Status:** FROZEN as of week 1. Changes require agreement from all four members and a
 version bump.
 
 **Rev 3 closes the six decisions left open in rev 2.** Changes: `TGT_ATTEN` bulk target
 added (rev 2 had no mechanism for writing IR-drop coefficients), reserved register range
 defined, unimplemented-address and read-only-write behaviour specified.
+
+**Rev 3.1 (week 2, editorial) reconciles the register map with `fecim_pkg.sv` and the
+component specs.** No opcode, register address, or frame layout changed, so the wire version
+stays `0x02`. Clarified: sigma register width and the two different sigma scale factors
+(§6.3); `ADC_BITS` reset value and range tied to `ACC_USED_W` (§6.5); `QUANT_MULT` reset
+value consistent with `QUANT_LEVELS`; `NOISE_SEED = 0` is valid with no remap (§6.6);
+`STUCK_RATE[16]` mode encoding. See `consistency-audit.md` §8.
 
 This document is the contract between the host (Lane D) and the board (Lane A). It defines
 what bytes cross the wire and what they mean. It says nothing about how either side is
@@ -148,7 +155,7 @@ Results persist until the next `COMPUTE`, so a retried read is always safe.
 | Offset | Width | Field |
 |---|---|---|
 | 0 | 2 | Magic `0xFEC1` |
-| 2 | 1 | Protocol version (currently `0x02`) |
+| 2 | 1 | Wire protocol version, `PROTO_VER` (currently `0x02`, §8) |
 | 3 | 1 | RTL build ID |
 | 4 | 2 | `NUM_LANES` |
 | 6 | 2 | `TILE_ROWS` |
@@ -203,17 +210,17 @@ All registers are 32 bits, accessed by index via `SET_CONFIG` and `GET_CONFIG`.
 |---|---|---|---|---|
 | `0x00` | `CTRL` | W | — | `[0]` soft reset, `[1]` clear results, `[2]` reseed LFSRs |
 | `0x01` | `TILE_CFG` | RW | full tile | `[15:0]` active rows, `[31:16]` active cols |
-| `0x02` | `QUANT_LEVELS` | RW | 255 | Conductance levels N, range 2–255 |
-| `0x03` | `D2D_SIGMA` | RW | 0 | Device-to-device variation, 9 bits |
-| `0x04` | `READ_SIGMA` | RW | 0 | Cycle-to-cycle read noise, 9 bits |
-| `0x05` | `NOISE_SEED` | RW | — | Global seed; 0 is remapped internally |
+| `0x02` | `QUANT_LEVELS` | RW | 255 | Conductance levels N, range 2–255. Written together with `QUANT_MULT` (§6.2) |
+| `0x03` | `D2D_SIGMA` | RW | 0 | Device-to-device variation, `[7:0]` used, scale `reg/256` (§6.3) |
+| `0x04` | `READ_SIGMA` | RW | 0 | Cycle-to-cycle read noise, `[7:0]` used, scale `reg/512` (§6.3) |
+| `0x05` | `NOISE_SEED` | RW | 0 | Global seed. 0 is valid and is **not** remapped (§6.6) |
 | `0x06` | `NOISE_EN` | RW | 0 | `[0]` quant `[1]` d2d `[2]` read `[3]` stuck `[4]` IR `[5]` adc |
-| `0x07` | `ADC_BITS` | RW | 32 | Output resolution, 4–32 |
-| `0x08` | `STUCK_RATE` | RW | 0 | `[15:0]` rate out of 65536, `[16]` mode |
+| `0x07` | `ADC_BITS` | RW | `ACC_USED_W` (24) | Output resolution, 4–`ACC_USED_W` (§6.5) |
+| `0x08` | `STUCK_RATE` | RW | 0 | `[15:0]` rate out of 65536, `[16]` mode: 0 = stuck-at-zero, 1 = stuck-at-rail |
 | `0x09` | `BAUD_INC` | RW | 2416 | UART fractional divider increment |
 | `0x0A` | `STATUS` | R | — | See §6.4 |
 | `0x0B` | `CYCLE_CNT` | R | — | Cycles taken by the last `COMPUTE` |
-| `0x0C` | `QUANT_MULT` | RW | — | `round(255·256/(N−1))`, Q8.8 |
+| `0x0C` | `QUANT_MULT` | RW | 257 | `round(255·256/(N−1))`, Q8.8, 16 bits. Reset matches `QUANT_LEVELS` = 255 |
 | `0x10`–`0x1F` | *reserved* | — | — | Semester 2: retention factor, per-column gain/offset, differential-pair enable, independent seeds |
 
 ### 6.0 Access policy
@@ -238,13 +245,22 @@ independently.
 
 ### 6.3 Sigma scaling
 
-Both sigma registers are unsigned, 9 bits used. The resulting noise standard deviation in
-weight LSBs:
+Both sigma registers are unsigned. **Bits `[7:0]` are used** (0–255); `[31:8]` are ignored.
+The RTL zero-extends the value to a 9-bit signed-positive operand (`SIGMA_W = 9`), which keeps
+each scaling multiply 9×9 signed so it packs two per block.
 
-| Register | σ in LSB | Register value for a target σ |
-|---|---|---|
-| `D2D_SIGMA` | `0.408 × reg` | `round(2.450 × σ)` |
-| `READ_SIGMA` | `0.144 × reg` | `round(6.93 × σ)` |
+The two registers have **different scale factors**, because the read-noise path shifts by 9
+and the variation path by 8. The resulting standard deviation in weight LSBs:
+
+| Register | RTL scaling | Effective scale | σ in LSB | Register value for a target σ | Max σ (reg = 255) |
+|---|---|---|---|---|---|
+| `D2D_SIGMA` | `(ih9 × sigma9) >>> 8` | `reg / 256` | `0.408 × reg` | `round(2.450 × σ)` | 104 LSB |
+| `READ_SIGMA` | `(ih9 × sigma9) >>> 9` | `reg / 512` | `0.144 × reg` | `round(6.93 × σ)` | 36.8 LSB |
+
+**Neither register is Q1.8.** Earlier drafts described both that way, which is correct for
+neither. The shifts above are normative; a model or RTL that uses the other shift fails L1
+equivalence by exactly a factor of two. The driver range-checks to 0–255 and warns rather
+than clamping silently.
 
 Converting a device measurement to LSB: `σ_LSB = 255 × σ_Vth / MW`, where `MW` is the
 memory window in volts. Derivation in `docs/device-model.md`.
@@ -283,7 +299,24 @@ shift      = ACC_USED_W - ADC_BITS
 ```
 
 The host derives `ACC_USED_W` from `TILE_ROWS` reported by `IDENTIFY`. Quantization is
-round-to-nearest. `ADC_BITS = ACC_USED_W` is an exact no-op.
+round-to-nearest. `ADC_BITS = ACC_USED_W` is an exact no-op, and is the reset value.
+
+The RTL saturates the shift at 0, so any `ADC_BITS ≥ ACC_USED_W` is also a no-op rather than a
+negative shift. The driver rejects values outside 4–`ACC_USED_W` before they reach the board.
+
+### 6.6 `NOISE_SEED`
+
+`NOISE_SEED = 0` is a valid seed and is **not** remapped. Zero is safe on both paths that use
+the seed:
+
+- **Read noise:** each lane's LFSR loads `(NOISE_SEED ^ LANE_SALT_C × lane_id) | 1`. The `| 1`
+  keeps every lane out of the Galois LFSR's all-zero lock-up state.
+- **Cell hash (D2D, stuck-at):** the hashes are seeded with `NOISE_SEED[15:0] ^ SEED_D2D` and
+  `NOISE_SEED[15:0] ^ SEED_STUCK`, which are distinct and non-zero for any seed.
+
+Earlier drafts remapped 0 to `0xACE1`. That rule is dropped: the per-lane guard makes it
+unnecessary, and every extra rule is one more thing `model_exact` and the driver must copy
+exactly. The LFSRs load the seed on reset and on `CTRL[2]`.
 
 ---
 
@@ -313,6 +346,10 @@ than attempting compatibility.
 Bump the version for any change to frame format, command opcodes, payload layouts, status
 codes, or register addresses. Adding a new command at an unused opcode, or a new register at
 an unused address, does **not** require a bump — older hosts simply never use them.
+
+The document revision and the wire version are separate numbers. Rev 3 only added an opcode
+(`0x09`) and assigned the reserved range, and rev 3.1 is editorial, so the wire version
+reported by `IDENTIFY` (`PROTO_VER` in `fecim_pkg.sv`) remains `0x02`.
 
 ---
 

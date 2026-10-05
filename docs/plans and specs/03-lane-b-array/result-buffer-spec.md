@@ -50,7 +50,7 @@ So `result_addr = {pass_idx, drain_cnt}` — concatenation, no arithmetic, becau
 power of two. `shift_en` asserts from cycle 1 onward; lane 0's own value is captured on
 cycle 0 before any shifting.
 
-Values pass through the shared ADC quantizer (MAC array spec §8) before being written, so
+Values pass through the shared ADC quantizer (MAC array spec §9) before being written, so
 the buffer holds post-ADC values.
 
 ---
@@ -64,7 +64,9 @@ Two small counters, both worth their area:
 data, but the host can tell it is stale.
 
 **`result_seq`** — an 8-bit counter incremented on every `COMPUTE` completion, exposed in
-`STATUS` and echoed in every readout response.
+`STATUS[15:8]`. It is **not** echoed in readout responses — `READ_RESULT` returns exactly
+`count × 4` bytes (protocol §4.4). The driver reads `STATUS` via `GET_CONFIG` after each
+`COMPUTE` (`host-driver-spec.md` §4.5).
 
 The sequence number earns its ten LEs the first time a `COMPUTE` response is lost and the
 driver retries. Without it, the host cannot distinguish "the compute happened and the
@@ -200,7 +202,7 @@ is not a classification metric needs the actual values.
 |---|---|---|---|
 | `0x08` | `READ_ARGMAX` | — | 10 bytes (§6.1) |
 
-`STATUS` (`0x0A`) gains:
+`STATUS` (`0x0A`) gains the following; the normative layout is `protocol.md` §6.4:
 
 | Bits | Field |
 |---|---|
@@ -223,7 +225,7 @@ is not a classification metric needs the actual values.
 | `result_seq`, `results_valid` | 15 | 0 |
 | **Total** | **~270** | **1** |
 
-Design running total: ~10,800 LEs (22%), 35 M9K (19%), 72 multipliers (25%).
+Design running total: see `top-level-spec.md` §9 (the whole-design rollup at 64 lanes).
 
 ---
 

@@ -40,8 +40,9 @@ bug; if they agree but `model_ideal` disagrees in the clean case, the bug is in
 `model_exact` must reproduce the RTL **exactly**, not approximately. That forbids things
 that would otherwise be natural:
 
-- **No floating point anywhere in the datapath.** Q1.8 scaling must be an integer multiply
-  and arithmetic shift matching the RTL's `>>> 9`, not a float multiply and round.
+- **No floating point anywhere in the datapath.** Sigma scaling must be an integer multiply
+  and arithmetic shift matching the RTL — `>>> 9` for `READ_SIGMA`, `>>> 8` for `D2D_SIGMA`
+  (protocol §6.3) — not a float multiply and round. Neither register is Q1.8.
 - **The hash must be identical**, including overflow. Use `uint16_t` so the 16-bit rounds
   wrap the way the RTL does; a wider type silently changes results.
 - **The LFSR advances on the same events** — on accumulate, not on every step. Model a
@@ -208,7 +209,9 @@ Random stimulus will not find these:
 - One-hot activation at row 0 — first-row clear-versus-accumulate priority
 - `stuck_rate = 0xFFFF` — every cell stuck
 - `QUANT_LEVELS = 2` — binary weights
-- `adc_bits = ACC_W` — ADC enabled but lossless, must be an exact no-op
+- `adc_bits = ACC_USED_W` — ADC enabled but lossless, must be an exact no-op (and any larger value)
+- `NOISE_SEED = 0` — valid, not remapped; every lane LFSR must still advance (`| 1` guard)
+- Register reset state — `QUANT_LEVELS` = 255 with `QUANT_MULT` = 257, `ADC_BITS` = `ACC_USED_W`
 - Maximum read noise with weights at ±127 — assert `w_n` never exceeds 9 bits signed
 
 The "enabled but lossless" case is a good bug detector: a path that changes the answer when it

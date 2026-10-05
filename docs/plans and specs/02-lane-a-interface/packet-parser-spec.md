@@ -57,7 +57,7 @@ Any packet declaring `LEN > MAX_PAYLOAD` is rejected immediately at the `LEN1` s
 without waiting for the payload. `LEN` stays 16 bits for protocol headroom even though the
 hardware enforces 512.
 
-512 is chosen so a 128-column result readout (128 × 3 = 384 bytes) fits in one packet.
+512 is chosen so a 128-column result readout (128 × 4 = 512 bytes) fits in one packet — exactly.
 Weight transfers should use **256-byte chunks** — see §4.2.
 
 ---
@@ -70,9 +70,13 @@ Weight transfers should use **256-byte chunks** — see §4.2.
 | `0x02` | `WRITE_ACT` | `[addr:2][data:N]` | — | bulk |
 | `0x03` | `SET_CONFIG` | `[reg:1][value:4]` | — | control |
 | `0x04` | `COMPUTE` | — | — | control |
-| `0x05` | `READ_RESULT` | `[start:2][count:2]` | `count × 3` bytes | control |
+| `0x05` | `READ_RESULT` | `[start:2][count:2]` | `count × 4` bytes (`int32`) | control |
 | `0x06` | `IDENTIFY` | — | 16 bytes (see §3.1) | control |
 | `0x07` | `GET_CONFIG` | `[reg:1]` | `[value:4]` | control |
+| `0x08` | `READ_ARGMAX` | — | 10 bytes (protocol §4.6) | control |
+| `0x09` | `WRITE_ATTEN` | `[addr:2][data:N]` | — | bulk |
+
+The normative command table is `protocol.md` §4; this copy must match it.
 
 ### 3.1 `IDENTIFY` response
 
@@ -130,7 +134,7 @@ A CRC failure costs a 256-byte retry instead of a 4 KB one, and the host can ret
 single chunk without rebuilding the whole tile.
 
 ```
-4 KB tile (64×64 × 8b) = 16 chunks × 256 bytes
+4 KB tile (64×64 × 8b, MVP) = 16 chunks × 256 bytes; 16 KB at 128×128 = 64 chunks
 Per chunk: [0xA5][0x01][0x02 0x01][addr:2][data:256][crc]
 ```
 
@@ -255,7 +259,7 @@ one more byte per frame. Design the driver so this is a one-line change.
 | `rx_valid` | in | 1 | |
 | **Bulk stream** | | | |
 | `bulk_we` | out | 1 | one cycle per payload byte |
-| `bulk_target` | out | 2 | `0`=weights, `1`=activations |
+| `bulk_target` | out | 2 | `bulk_target_e`: `0` weights, `1` activations, `2` attenuation |
 | `bulk_addr` | out | 16 | auto-incrementing |
 | `bulk_data` | out | 8 | |
 | **Config** | | | |
@@ -268,7 +272,7 @@ one more byte per frame. Design the driver so this is a one-line change.
 | `compute_busy` | in | 1 | |
 | **Readout** | | | |
 | `rd_addr` | out | 16 | |
-| `rd_data` | in | 24 | combinational or 1-cycle |
+| `rd_data` | in | 32 | result word (`ACC_W`), combinational or 1-cycle |
 | **Response** | | | |
 | `resp_*` | — | — | handshake to `packet_tx` |
 
@@ -289,7 +293,7 @@ for a response or a read timeout, retry on either.
 
 ### 7.3 Busy handling
 
-`compute_busy` is asserted for ~135 cycles (2.7 µs), while the next packet cannot arrive
+`compute_busy` is asserted for 392 cycles (7.8 µs) at 128×128, 200 cycles (4.0 µs) at the 64×64 MVP, while the next packet cannot arrive
 for at least 86 µs at 115200. The busy path will never be exercised in normal operation.
 Implement it anyway — it costs one state and one status code, and it stops being
 unreachable the moment someone raises the baud rate or adds a streaming mode.
@@ -351,9 +355,10 @@ drop-in.
 2. **Should `GET_CONFIG` exist?** It is ~20 LEs and makes the driver able to verify what
    it set, which is worth it during calibration when you are sweeping parameters and need
    to be certain the board agrees with the host.
-3. **Sequence numbers?** A one-byte counter would let the host detect a dropped response
+3. **Sequence numbers?** *Resolved: `result_seq` in `STATUS[15:8]` (protocol §6.4), read via
+   `GET_CONFIG` after each `COMPUTE` — no frame change.* A one-byte counter would let the host detect a dropped response
    rather than inferring it from a timeout. Probably unnecessary given request/response
    lockstep, but decide now — retrofitting changes the frame.
 4. **Does `COMPUTE` respond immediately or on completion?** Respond on completion. At
-   2.7 µs the host cannot observe the difference, and it makes the driver's `compute()`
+   7.8 µs the host cannot observe the difference, and it makes the driver's `compute()`
    naturally blocking with no polling loop.

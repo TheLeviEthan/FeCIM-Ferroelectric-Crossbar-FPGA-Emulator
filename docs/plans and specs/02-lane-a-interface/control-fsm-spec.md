@@ -37,6 +37,10 @@ ignored pipeline drain and accumulator readout.
 
 **200 cycles at 50 MHz = 4.0 µs.** Use this number in the report, not 2.7 µs.
 
+These figures are the **week-6 MVP configuration** (64×64, 32 lanes). The full 128×128,
+64-lane tile is `2 × (1 + 128 + 3 + 64)` = **392 cycles = 7.8 µs**. Worked examples elsewhere
+in this spec also use the MVP geometry; every formula is parameterized.
+
 The conclusion is unchanged and if anything strengthened: the array is still four orders
 of magnitude faster than the 360 ms UART weight load, so end-to-end timing is entirely
 host-bound. But the report should quote a number that was derived rather than one that
@@ -57,7 +61,7 @@ upper bits, row index in the lower.
 ### 3.1 The address decode is free
 
 Because the row count is a power of two, the sequence counter *is* the weight address.
-With `R = 64` and `L = 32`:
+With `R = 64` and `L = 32` (MVP geometry — at 128×128 / 64 lanes each slice widens by one bit):
 
 ```
 seq_cnt : 0 .. (passes·R - 1)              // 0..127 for a 64×64 tile
@@ -81,6 +85,11 @@ lane_sel   = c[4:0]                        // c mod 32
 p          = c[15:5]                       // c div 32
 local_addr = {p, r}
 ```
+
+`bulk_target` (`bulk_target_e`) selects the destination. `TGT_WEIGHTS` (0) uses the decode
+above. `TGT_ACT` (1) and `TGT_ATTEN` (2) use `bulk_addr` directly as the row index into the
+activation buffer and the IR-drop `atten_rom` respectively (protocol §4.2–4.2b,
+`activation-buffer-spec.md` §6.2). The parser never generates target 3.
 
 All wire slicing. **This is why `R` and `L` must stay powers of two.** If someone proposes
 a 100-row tile to match a dataset, the cost is a divider in the address path and a
@@ -179,20 +188,33 @@ and needs no attention in the instantiation.
 Little-endian, 32 bits per register, byte-addressed by index. **Freeze this in week 1** —
 Lane B's model and Lane C's driver both encode it.
 
-| Addr | Name | Access | Description |
-|---|---|---|---|
-| `0x00` | `CTRL` | W | `[0]` soft reset, `[1]` clear results, `[2]` reseed LFSRs |
-| `0x01` | `TILE_CFG` | RW | `[15:0]` active rows, `[31:16]` active cols |
-| `0x02` | `QUANT_LEVELS` | RW | conductance levels, 2–256 |
-| `0x03` | `D2D_SIGMA` | RW | device-to-device variation scale (Q8.8) |
-| `0x04` | `READ_SIGMA` | RW | cycle-to-cycle read noise scale (Q8.8) |
-| `0x05` | `NOISE_SEED` | RW | LFSR seed, 0 is remapped to `0xACE1` |
-| `0x06` | `NOISE_EN` | RW | `[0]` quant `[1]` d2d `[2]` read `[3]` stuck `[4]` IR `[5]` ADC |
-| `0x07` | `ADC_BITS` | RW | output truncation width, 4–24 |
-| `0x08` | `STUCK_RATE` | RW | stuck-at injection rate |
-| `0x09` | `BAUD_INC` | RW | UART fractional divider increment |
-| `0x0A` | `STATUS` | R | `[3:0]` FSM state, `[4]` busy, `[5]` last error |
-| `0x0B` | `CYCLE_CNT` | R | cycles taken by the last `COMPUTE` |
+The normative register map is `protocol.md` §6 (wire behaviour) and `cfg_addr_e` in
+`fecim_pkg.sv` (addresses). It is reproduced here for convenience; **if this table ever
+disagrees with `protocol.md`, `protocol.md` wins.**
+
+| Addr | Name | Access | Reset | Description |
+|---|---|---|---|---|
+| `0x00` | `CTRL` | W | — | Self-clearing strobes: `[0]` soft reset, `[1]` clear results, `[2]` reseed LFSRs |
+| `0x01` | `TILE_CFG` | RW | full tile | `[15:0]` active rows, `[31:16]` active cols |
+| `0x02` | `QUANT_LEVELS` | RW | 255 | conductance levels N, 2–255 |
+| `0x03` | `D2D_SIGMA` | RW | 0 | device-to-device variation, `[7:0]` used, scale `reg/256` |
+| `0x04` | `READ_SIGMA` | RW | 0 | cycle-to-cycle read noise, `[7:0]` used, scale `reg/512` |
+| `0x05` | `NOISE_SEED` | RW | 0 | global seed; 0 is valid, no remap (protocol §6.6) |
+| `0x06` | `NOISE_EN` | RW | 0 | `[0]` quant `[1]` d2d `[2]` read `[3]` stuck `[4]` IR `[5]` ADC |
+| `0x07` | `ADC_BITS` | RW | `ACC_USED_W` | output resolution, 4–`ACC_USED_W` |
+| `0x08` | `STUCK_RATE` | RW | 0 | `[15:0]` rate out of 65536, `[16]` mode (0 zero, 1 rail) |
+| `0x09` | `BAUD_INC` | RW | 2416 | UART fractional divider increment (115200 baud) |
+| `0x0A` | `STATUS` | R | — | `[3:0]` FSM state, `[4]` busy, `[5]` last error, `[6]` `results_valid`, `[15:8]` `result_seq` |
+| `0x0B` | `CYCLE_CNT` | R | — | cycles taken by the last `COMPUTE` |
+| `0x0C` | `QUANT_MULT` | RW | 257 | `round(255·256/(N−1))`, Q8.8, host-computed |
+| `0x10`–`0x1F` | *reserved* | — | — | semester 2; behave as unimplemented until assigned |
+
+**Access policy** (protocol §6.0): an unimplemented or reserved address, or a `SET_CONFIG` to
+a read-only register (`STATUS`, `CYCLE_CNT`), returns `ST_ADDR_RANGE` and changes nothing.
+
+**The two sigma registers are not Q1.8 and do not share a scale** — `D2D_SIGMA` is shifted by
+8 and `READ_SIGMA` by 9 (protocol §6.3). The config file stores `[7:0]` and presents each as a
+9-bit signed-positive operand, `{1'b0, reg[7:0]}`.
 
 ### 6.1 `NOISE_EN` is the most important register in the design
 
@@ -212,14 +234,17 @@ simultaneously.
 columns are drained, letting you sweep tile sizes without a rebuild.
 
 They do **not** change the address stride. Weight addressing always uses the physical
-`R_MAX = 64` stride, so a 48-row configuration uses addresses 0–47 of each 64-entry
-region and leaves 48–63 unread. Non-power-of-two active sizes are therefore free; the
+`TILE_ROWS` stride (128), so a 48-row configuration uses addresses 0–47 of each 128-entry
+region and leaves 48–127 unread. `active_cols` need not be a multiple of `NUM_LANES`: the
+sequencer rounds the pass count up and argmax masks columns at or beyond `active_cols`
+(protocol §6.3b). Non-power-of-two active sizes are therefore free; the
 physical tile stays a power of two and the wire-slice decode of §3.1 is preserved.
 
 ### 6.3 Reset defaults
 
-On reset: `TILE_CFG` = full tile, `NOISE_EN` = 0, `QUANT_LEVELS` = 256, all sigmas = 0,
-`BAUD_INC` = 115200.
+On reset (values from protocol §6): `TILE_CFG` = full tile, `NOISE_EN` = 0,
+`QUANT_LEVELS` = 255 with `QUANT_MULT` = 257 (a consistent pair), both sigmas = 0,
+`NOISE_SEED` = 0, `ADC_BITS` = `ACC_USED_W`, `STUCK_RATE` = 0, `BAUD_INC` = 2416 (115200 baud).
 
 **Reset means an ideal, noiseless crossbar.** A freshly configured board computes exact
 integer MVMs, so if the first thing you see after programming is wrong, the problem is the
@@ -229,7 +254,7 @@ datapath and not a noise setting someone left enabled.
 
 ## 7. Result buffer
 
-`C × 24` bits — 64 × 24 for the MVP. One M9K in 256×32 mode holds 256 results with room
+`TILE_COLS × ACC_W` bits — 128 × 32 at full size, 64 × 32 for the MVP. One M9K in 256×32 mode holds 256 results with room
 for a 128-column tile and 32-bit accumulators.
 
 Written one word per cycle during `DRAIN`, read by the parser during `READ_RESULT`.
@@ -246,19 +271,29 @@ Not decorative. This is the physical interface M0 asks for in an Infrastructure 
 and it is the only debug channel that keeps working when the serial link is the thing
 that is broken.
 
+The authoritative assignment is `top-level-spec.md` §6.2; summarized:
+
 | Element | Shows |
 |---|---|
-| `HEX5`–`HEX4` | FSM state (hex) |
-| `HEX3`–`HEX0` | `result[0]`, or RX byte count, selected by `SW[0]` |
+| `HEX5`–`HEX4` | Control FSM state (hex), from `ctrl_state_e` |
+| `HEX3`–`HEX0` | Selected by `SW[1:0]`: `00` RX byte count · `01` `result[0]` low 16 bits · `10` argmax index · `11` error counters |
+| `HEX0[7]` (DP) | Heartbeat, toggles once per second |
 | `LEDR[9]` | busy |
 | `LEDR[8]` | error latched since reset |
-| `LEDR[7:0]` | `pass_idx` and row counter activity |
+| `LEDR[7]` | UART RX activity (stretched to be visible) |
+| `LEDR[6:0]` | `pass_idx` and row counter activity |
+
+**The HEX displays are active-low** (common anode) and 8 bits wide, bit 7 being the decimal
+point: drive `HEX = ~{dp, seg}`. Written the natural way, every segment is inverted — legible
+enough to be confusing rather than obviously broken (`hardware-verification-errata.md` §3.1).
 
 During week-3 bring-up, a HEX display that increments on every received byte tells you the
 UART works before the parser exists. Build the display driver early — it is 150 LEs and it
 pays for itself the first evening the link misbehaves.
 
-`KEY0` is asynchronous reset, synchronized to `clk` with a two-flop deassert. `KEY1` is a
+`KEY0` is asynchronous reset, synchronized to `clk` with a two-flop deassert. Both keys are
+**hardware-debounced** on the DE10-Lite (Schmitt-trigger inputs), so the RTL synchronizes
+them but needs no debounce logic. `KEY1` is a
 manual `COMPUTE` trigger using whatever is already loaded, which makes a
 host-independent demo possible if the laptop link dies mid-presentation.
 
@@ -275,6 +310,9 @@ host-independent demo possible if the laptop link dies mid-presentation.
 | Result buffer control | 40 | 1 |
 | Display driver | 150 | 0 |
 | **Total** | **~1,450** | **1** |
+
+*These are MVP (32-lane) figures. The whole-design rollup at 64 lanes is
+`top-level-spec.md` §9.*
 
 Running total for the design so far: UART ~140, parser ~400, control ~1,450 — about
 2,000 LEs, roughly 4% of the 10M50, before the lane array.
@@ -293,9 +331,11 @@ Running total for the design so far: UART ~140, parser ~400, control ~1,450 — 
    the shift chain reverses column order — check for exactly that.
 4. **Multi-pass.** Confirm pass 1 results do not overwrite pass 0. Use column values that
    make an ordering error obvious rather than random data.
-5. **Register file.** Write and read back all registers; confirm read-only registers
-   ignore writes; confirm reset defaults match §6.3.
-6. **`TILE_CFG` sweep.** Run 8×8, 32×32, 48×48, 64×64 and confirm each matches the model
+5. **Register file.** Write and read back all registers; confirm a write to a read-only
+   register, an unimplemented address, or a reserved address (`0x10`–`0x1F`) returns
+   `ST_ADDR_RANGE` and changes nothing; confirm reset defaults match §6.3, including
+   `QUANT_MULT` = 257 and `ADC_BITS` = `ACC_USED_W`.
+6. **`TILE_CFG` sweep.** Run 8×8, 32×32, 48×48, 64×64, 128×128, and a column count that is not a multiple of `NUM_LANES` (e.g. 48), and confirm each matches the model
    with the correct number of rows contributing.
 7. **`NOISE_EN` isolation.** With all bits clear, RTL must be bit-exact against the
    reference model over 1,000 random matrices. This is the single most important test in
@@ -314,9 +354,9 @@ Running total for the design so far: UART ~140, parser ~400, control ~1,450 — 
    reproducible, which matters for the model equivalence tests. Automatic reseeding makes
    noise statistics independent across runs, which matters for sweeps. Recommend explicit,
    with the host reseeding between sweep points.
-3. **Does `active_cols` need to be a multiple of `L`?** If not, the final pass drains
-   partially and the shift chain needs a variable count. Simplest answer: round up and
-   discard the extra columns on the host.
+3. ~~**Does `active_cols` need to be a multiple of `L`?**~~ **Resolved (protocol §6.3b):**
+   no. The sequencer rounds the pass count up and drains full lane groups; argmax masks
+   columns at or beyond `active_cols`.
 4. **Do we want a `SELF_TEST` command** that loads a known matrix from a ROM, computes,
    and compares against a stored expected result — a one-packet health check for the
    demo? About 100 LEs and one M9K, and it makes "is the board working" answerable in one

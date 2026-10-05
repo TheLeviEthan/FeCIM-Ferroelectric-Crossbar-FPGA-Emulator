@@ -177,17 +177,22 @@ claiming a theoretical form the construction does not have.
 Scale and clamp:
 
 ```systemverilog
+logic signed [8:0]  sigma9;
 logic signed [17:0] scaled;
 logic signed [7:0]  noise_q;                   // registered, cycle N+1
 
-assign scaled  = (ih9 * $signed({1'b0, sigma9})) >>> 9;      // Q1.8
+assign sigma9  = $signed({1'b0, read_sigma[7:0]});          // 0..255, signed-positive
+assign scaled  = (ih9 * sigma9) >>> 9;                      // scale = READ_SIGMA / 512
 assign noise_q = (scaled >  NOISE_CLAMP) ?  8'sd127 :
                  (scaled < -NOISE_CLAMP) ? -8'sd127 : scaled[7:0];
 ```
 
-`sigma9` is Q1.8 spanning 0 to 0.996 in steps of 1/256, giving noise-σ granularity of about
-0.29 LSB — finer than any sweep needs. At maximum sigma the noise standard deviation is
-roughly 57% of full weight scale, which is far beyond any realistic device.
+**`READ_SIGMA` is not Q1.8.** Its 8 used bits are zero-extended to a 9-bit signed-positive
+operand and the product is shifted by 9, so the effective scale is `READ_SIGMA / 512`,
+spanning 0 to 0.498 in steps of 1/512. Noise σ is `0.144 × READ_SIGMA` LSB: about 0.14 LSB
+granularity and a 36.8 LSB maximum, which sits 3.4σ inside the ±127 clamp so clipping stays
+negligible (`cell-physics-derivation.md` §4.3, `protocol.md` §6.3). Earlier revisions called
+this Q1.8 while shifting by 9 — a factor-of-two contradiction. **The shift is normative.**
 
 ### 5.4 The clamp value is structural, not arbitrary
 
@@ -273,8 +278,9 @@ assign act_atten = noise_en.ir ? ((act_raw * atten_rom[row_idx]) >> 8)
                                :   act_raw;
 ```
 
-`atten_rom` is a `TILE_ROWS` × 8-bit coefficient table in logic, host-writable, defaulting
-to all-ones.
+`atten_rom` is a `TILE_ROWS` × 8-bit Q0.8 coefficient table in logic, written by the host
+through `WRITE_ATTEN` (`0x09`, bulk target `TGT_ATTEN = 2`, protocol §4.2b). It resets to all
+`255` (0.996) and is applied only when `NOISE_EN[4]` is set.
 
 This works precisely **because** the model is a row-position-dependent approximation. A
 rigorous IR-drop treatment depends on total column current, which differs per column and
@@ -296,8 +302,10 @@ Results pass through the shift chain one per cycle during `DRAIN`, so quantizati
 logic [4:0]         sh;
 logic signed [31:0] adc_out;
 
-assign sh = ACC_W - adc_bits;
-assign adc_out = noise_en.adc
+// Full scale is the USED accumulator range (ACC_USED_W = 24 at 128 rows), not the
+// 32-bit container. ADC_BITS >= ACC_USED_W saturates the shift at 0: an exact no-op.
+assign sh = (adc_bits >= ACC_USED_W) ? 5'd0 : 5'(ACC_USED_W - adc_bits);
+assign adc_out = (noise_en.adc && sh != 5'd0)
                ? (($signed(acc_chain_out) + (32'sd1 <<< (sh-1))) >>> sh) <<< sh
                :   acc_chain_out;
 ```
@@ -307,7 +315,11 @@ which is what a real ADC does. Plain truncation introduces a systematic negative
 grows with the number of accumulated terms — a consistent downward offset easily misread as
 a weight-mapping error.
 
-One 32-bit barrel shifter, ~160 LEs, once. Guard `sh == 0` so `adc_bits == ACC_W` is an
+**Quantize over `ACC_USED_W`, not `ACC_W`.** The accumulator never exceeds ±8,290,560
+(24 signed bits). Using the 32-bit container width puts full scale at ±2³¹, so at 8 bits every
+result collapses into one or two codes (`cell-physics-derivation.md` §6.1, `protocol.md` §6.5).
+
+One 32-bit barrel shifter, ~160 LEs, once. Guard `sh == 0` so `adc_bits ≥ ACC_USED_W` is an
 exact no-op rather than a shift by −1.
 
 ---
@@ -393,8 +405,9 @@ Test 2 is the foundation; everything else assumes it passes.
    exactly rather than hoping random stimulus finds it.
 8. **Drain ordering.** Distinct known value per column; confirm the shift chain deposits
    them at the right result-buffer addresses. An off-by-one reverses column order.
-9. **ADC rounding.** Sweep `adc_bits` from 4 to 32; confirm round-to-nearest, zero mean
-   error, and that `adc_bits == ACC_W` is an exact no-op.
+9. **ADC rounding.** Sweep `adc_bits` from 4 to `ACC_USED_W`; confirm round-to-nearest, zero
+   mean error, and that `adc_bits == ACC_USED_W` is an exact no-op. Also confirm values above
+   `ACC_USED_W` (up to 31) are no-ops rather than negative shifts.
 10. **IR factorization.** Verify that attenuating the activation gives bit-identical results
     to attenuating each product, against a reference that does it the expensive way. Proves
     the §8 optimization is exact rather than approximate.
@@ -415,7 +428,8 @@ Test 2 is the foundation; everything else assumes it passes.
 2. **ADC before or after argmax?** After is cheaper; before is physically correct and lets
    coarse quantization flip near-ties, which is realistic and shows up as a floor in the
    margin plot. Recommend before.
-3. **`atten_rom` host-writable or synthesis constant?** Host-writable costs 128 register
+3. **`atten_rom` host-writable or synthesis constant?** *Resolved — host-writable via
+   `WRITE_ATTEN` / `TGT_ATTEN` (protocol rev 3).* Host-writable costs 128 register
    writes at setup and allows sweeping IR severity without a rebuild. Recommend
    host-writable.
 4. **Per-lane accumulator saturation?** 32 bits cannot overflow within the stated range, so

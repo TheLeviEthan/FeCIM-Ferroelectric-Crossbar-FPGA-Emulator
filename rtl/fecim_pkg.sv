@@ -4,6 +4,8 @@
 // Shared parameters, types, and protocol encodings for the FeCIM crossbar
 // emulator. Every RTL module and every testbench imports this package.
 //
+// Rev 4.1 -- comments only: sigma register scaling, ADC_BITS range, NOISE_SEED,
+//            QUANT_MULT reset (protocol.md rev 3.1). No value changes.
 // Rev 4 -- elaboration assertions moved out of the package into
 //          rtl/fecim_pkg_checks.sv: IEEE 1800 does not allow an initial
 //          block inside a package, and Verilator rejects it as a syntax error.
@@ -67,7 +69,7 @@ package fecim_pkg;
     parameter int ACT_W           = 8;    // activation, UNSIGNED 0..255
     parameter int NOISE_W         = 8;    // read noise, signed, clamped +/-127
     parameter int W_N_W           = 9;    // weight + noise, signed, +/-254
-    parameter int SIGMA_W         = 9;    // Q1.8, signed-positive
+    parameter int SIGMA_W         = 9;    // {1'b0, reg[7:0]}, signed-positive
     parameter int PROD_W          = 18;   // 9x9 signed product
     parameter int ACC_W           = 32;   // accumulator
 
@@ -199,16 +201,16 @@ package fecim_pkg;
         REG_CTRL         = 8'h00,
         REG_TILE_CFG     = 8'h01,
         REG_QUANT_LEVELS = 8'h02,
-        REG_D2D_SIGMA    = 8'h03,
-        REG_READ_SIGMA   = 8'h04,   // Q1.8, 9 bits used
-        REG_NOISE_SEED   = 8'h05,
+        REG_D2D_SIGMA    = 8'h03,   // [7:0] used, scale reg/256 (>>> 8). Not Q1.8
+        REG_READ_SIGMA   = 8'h04,   // [7:0] used, scale reg/512 (>>> 9). Not Q1.8
+        REG_NOISE_SEED   = 8'h05,   // 0 is valid, no remap; lane LFSR = (seed^salt)|1
         REG_NOISE_EN     = 8'h06,
-        REG_ADC_BITS     = 8'h07,
+        REG_ADC_BITS     = 8'h07,   // 4..ACC_USED_W, reset ACC_USED_W; >= is a no-op
         REG_STUCK_RATE   = 8'h08,   // [15:0] rate, [16] mode
         REG_BAUD_INC     = 8'h09,
         REG_STATUS       = 8'h0A,
         REG_CYCLE_CNT    = 8'h0B,
-        REG_QUANT_MULT   = 8'h0C    // Q8.8: round(255*256/(N-1)), 16 bits
+        REG_QUANT_MULT   = 8'h0C    // Q8.8: round(255*256/(N-1)), 16 bits, reset 257
         // 0x10-0x1F reserved for semester 2 -- see docs/protocol.md section 6.0
     } cfg_addr_e;
 

@@ -175,6 +175,9 @@ address. Two cells in different lanes must not collide.
 
 Four multiplier blocks total for both hashes.
 
+`NOISE_SEED = 0` needs no special case here: the XOR with `SEED_D2D` / `SEED_STUCK` keeps both
+hash seeds distinct and non-zero for any seed value (`protocol.md` §6.6).
+
 ### 5.1 Uniform to bell-shaped
 
 Each hash yields 16 bits, so the variation sum uses **two** bytes rather than four:
@@ -206,8 +209,10 @@ calibration, not before.
 logic signed [17:0] d2d_scaled;
 logic signed [10:0] w_sum;
 logic signed [7:0]  w_var;
+logic signed [8:0]  d2d_sigma9;
 
-assign d2d_scaled = (ih9 * $signed({1'b0, d2d_sigma9})) >>> 8;   // Q1.8, 9×9 → ½ block
+assign d2d_sigma9 = $signed({1'b0, d2d_sigma[7:0]});         // 0..255, signed-positive
+assign d2d_scaled = (ih9 * d2d_sigma9) >>> 8;                 // D2D_SIGMA / 256, 9×9 → ½ block
 
 assign w_sum = $signed({{3{w_q[7]}}, w_q}) + d2d_scaled[10:0];
 assign w_var = (w_sum >  127) ?  8'sd127 :
@@ -279,7 +284,7 @@ everything else rests on.
 
 | Addr | Name | Access | Description |
 |---|---|---|---|
-| `0x0C` | `QUANT_MULT` | RW | `round(255·256/(N−1))`, Q8.8, host-computed |
+| `0x0C` | `QUANT_MULT` | RW | `round(255·256/(N−1))`, Q8.8, host-computed; reset 257 (matches `QUANT_LEVELS` = 255) |
 
 And `REG_STUCK_RATE` (`0x08`) is refined:
 
@@ -288,7 +293,9 @@ And `REG_STUCK_RATE` (`0x08`) is refined:
 | `[15:0]` | fault rate threshold, out of 65536 |
 | `[16]` | stuck mode: 0 = stuck-at-zero, 1 = stuck-at-rail |
 
-`REG_D2D_SIGMA` (`0x03`) uses 9 bits, Q1.8, matching `REG_READ_SIGMA`.
+`REG_D2D_SIGMA` (`0x03`) uses bits `[7:0]`, zero-extended to a 9-bit signed-positive operand.
+Its scale is `D2D_SIGMA / 256` (σ = 0.408 × reg LSB, 104 LSB at 255). This does **not** match
+`REG_READ_SIGMA`, which is scaled by /512 — see `protocol.md` §6.3.
 
 ---
 

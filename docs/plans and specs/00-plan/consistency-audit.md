@@ -176,20 +176,20 @@ mechanism by which F2–F5 happened.
 
 ## 6. Edit checklist
 
-Apply before RTL work begins in earnest.
+Apply before RTL work begins in earnest. **All applied in the week-2 pass (§8).**
 
-- [ ] `mac-array-spec.md` §9: `ACC_W` → `ACC_USED_W` in the ADC shift **(F2, blocking)**
-- [ ] `mac-array-spec.md` §9: add the `adc_bits == ACC_USED_W` no-op test case
-- [ ] `mac-array-spec.md` §5.3: correct the Q1.8 prose to `sigma9/512` **(F3, blocking)**
-- [ ] `mac-array-spec.md` §8: reference `TGT_ATTEN` for coefficient loading
-- [ ] `hardware-verification-errata.md` §2.3: same Q1.8 correction **(F3)**
-- [ ] `packet-parser-spec.md` §3: `count × 3` → `count × 4`; add `0x08`, `0x09` **(F4)**
-- [ ] `control-fsm-spec.md` §6: add `QUANT_MULT`, reserved range, access policy **(F5)**
-- [ ] `control-fsm-spec.md` §8: HEX active-low, 8 bits, buttons pre-debounced **(F5)**
-- [ ] `control-fsm-spec.md`, `activation-buffer-spec.md`, `result-buffer-spec.md`: label
+- [x] `mac-array-spec.md` §9: `ACC_W` → `ACC_USED_W` in the ADC shift **(F2, blocking)**
+- [x] `mac-array-spec.md` §9: add the `adc_bits == ACC_USED_W` no-op test case
+- [x] `mac-array-spec.md` §5.3: correct the Q1.8 prose to `sigma9/512` **(F3, blocking)**
+- [x] `mac-array-spec.md` §8: reference `TGT_ATTEN` for coefficient loading
+- [x] `hardware-verification-errata.md` §2.3: same Q1.8 correction **(F3)**
+- [x] `packet-parser-spec.md` §3: `count × 3` → `count × 4`; add `0x08`, `0x09` **(F4)**
+- [x] `control-fsm-spec.md` §6: add `QUANT_MULT`, reserved range, access policy **(F5)**
+- [x] `control-fsm-spec.md` §8: HEX active-low, 8 bits, buttons pre-debounced **(F5)**
+- [x] `control-fsm-spec.md`, `activation-buffer-spec.md`, `result-buffer-spec.md`: label
       64×64 / 32-lane figures as the week-6 MVP configuration **(F6)**
-- [ ] `host-driver-spec.md` §6: add `set_ir_drop(coeffs)` **(F1 follow-on)**
-- [ ] `control-fsm-spec.md`: handle `TGT_ATTEN` in the bulk write decode **(F1 follow-on)**
+- [x] `host-driver-spec.md` §6: add `set_ir_drop(coeffs)` **(F1 follow-on)**
+- [x] `control-fsm-spec.md`: handle `TGT_ATTEN` in the bulk write decode **(F1 follow-on)**
 
 ---
 
@@ -208,3 +208,38 @@ the exact check that would have caught F1 in week 1.
 **Assert numeric relationships in the package rather than in prose.** `ACC_USED_W ≤ ACC_W`
 and `QUANT_LEVELS_MAX ≤ 255` are now elaboration assertions, so a future widening fails at
 compile time. Prose constraints drift; assertions do not.
+
+---
+
+## 8. Second pass — register map reconciliation (week 2)
+
+**Scope:** every register-map statement across the specs, `fecim_pkg.sv`, the RTL skeleton,
+and the C++ model, checked against `protocol.md` §6. The §6 checklist above was also applied.
+
+**Result: eight disagreements, all resolved in favour of the package and the arithmetic.**
+`protocol.md` is now rev 3.1 (editorial; wire version unchanged at `0x02`).
+
+| # | Disagreement | Resolution | Edited |
+|---|---|---|---|
+| R1 | Sigma format: "Q8.8" (control-fsm), "Q1.8" (pkg, errata, mac-array, write-path), "9 bits" (protocol) | Both registers use `[7:0]`, zero-extended to a 9-bit signed-positive operand. **`D2D_SIGMA` = `reg/256`** (`>>> 8`), **`READ_SIGMA` = `reg/512`** (`>>> 9`). Neither is Q1.8. Max σ 104 and 36.8 LSB | protocol §6.3, control-fsm §6, mac-array §5.3, write-path §5.2/§7, errata §2.3, model-verif §2, host-driver §6.1, pkg comments, RTL, C++ |
+| R2 | `QUANT_LEVELS` range 2–256 and reset 256 (control-fsm) | 2–255, reset 255 | control-fsm §6, §6.3 |
+| R3 | `QUANT_MULT` missing from control-fsm; reset "—" in protocol | Reset **257**, so the reset pair is consistent | protocol §6, control-fsm §6, write-path §7, RTL, C++ |
+| R4 | `ADC_BITS` reset 32 / range 4–32 (protocol), 4–24 (control-fsm), `adc_bits == ACC_W` no-op (mac-array, model-verif) | Reset `ACC_USED_W`, range 4–`ACC_USED_W`; RTL saturates shift at 0 so larger values are no-ops | protocol §6/§6.5, control-fsm, mac-array §9/test 9, model-verif §6.2 |
+| R5 | `STATUS` layout differed (control-fsm lacked `[6]`, `[15:8]`); result-buffer said `result_seq` is "echoed in every readout response", which the frame format does not allow | protocol §6.4 layout everywhere; `result_seq` lives only in `STATUS`, read via `GET_CONFIG` | control-fsm §6, result-buffer §4/§7, packet-parser open questions |
+| R6 | `NOISE_SEED = 0` "remapped to `0xACE1`" (control-fsm) vs "remapped internally" (protocol) vs per-lane `| 1` guard (mac-array) | No remap. Per-lane `| 1` protects the LFSRs; the hash seeds are XORed with non-zero constants. New protocol §6.6 | protocol, control-fsm, write-path §5, host-driver §6.6, model-verif |
+| R7 | `CTRL[1]` "zeroes the activation buffer" (activation-buffer) vs "clear results" (protocol) | `CTRL[1]` clears results only; stale-activation defence is driver-side | activation-buffer §6.1 |
+| R8 | Protocol doc says "Version 3" but `IDENTIFY` reports `0x02` | Document revision and wire version are separate; rev 3/3.1 changes need no wire bump (§8) | protocol header, §4.5, §8 |
+
+Also fixed while there: `TILE_CFG` stride was "`R_MAX = 64`" (now `TILE_ROWS`); `BAUD_INC`
+reset was given as a baud rate rather than the increment 2416; `READ_RESULT` width and the
+2.7 µs busy figure in packet-parser; `rd_data` port width 24 → 32; the `TGT_ATTEN` path is
+now documented in activation-buffer §6.2 and control-fsm §3.1; access policy and reserved
+range added to control-fsm.
+
+**Decisions made in this pass that the team should confirm** (none changes the wire format):
+`QUANT_MULT` reset 257; `ADC_BITS ≥ ACC_USED_W` is a no-op; no `NOISE_SEED` remap; the driver's
+`seed()` pulses `CTRL[2]` after writing `NOISE_SEED`.
+
+**Not changed, flagged:** the multiplier total is 71 blocks in `top-level-spec.md` §9 but 72 in
+the errata and `mac-array-spec.md` §11 (write path counted as 6 vs 7). Settle it from the
+fitter report.
