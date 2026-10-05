@@ -32,7 +32,7 @@ module write_path
     input  noise_en_t           noise_en,
     input  logic [7:0]          quant_levels,
     input  logic [15:0]         quant_mult,
-    input  logic [15:0]         d2d_sigma,
+    input  logic [SIGMA_W-1:0]  d2d_sigma,       // {1'b0, D2D_SIGMA[7:0]}, scale /256
     input  logic [16:0]         stuck_rate,
 
     // to lane weight memories (port A)

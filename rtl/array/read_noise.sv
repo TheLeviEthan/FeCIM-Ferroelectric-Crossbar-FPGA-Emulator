@@ -1,7 +1,7 @@
 //=============================================================================
 // read_noise.sv -- Lane B
 //
-// Per-lane read-noise generator: 32-bit Galois LFSR, bell-shaped sum, Q1.8 scale, +/-127 clamp.
+// Per-lane read-noise generator: 32-bit Galois LFSR, bell-shaped sum, READ_SIGMA/512 scale, +/-127 clamp.
 // Spec: mac-array-spec.md §5
 //
 // SKELETON. Port list is provisional -- confirm against the spec and the
@@ -26,7 +26,7 @@ module read_noise
     input  logic [31:0]         noise_seed,
     input  logic                reseed,
     input  logic                advance,         // acc_en ONLY -- never free-run
-    input  logic [SIGMA_W-1:0]  sigma,           // Q1.8
+    input  logic [SIGMA_W-1:0]  sigma,           // {1'b0, READ_SIGMA[7:0]}, scale /512 (>>> 9)
     output logic [NOISE_W-1:0]  noise_q          // signed, clamped to +/-NOISE_CLAMP
 );
 

@@ -239,6 +239,9 @@ measured device data would be misleading.
 
 ### 6.1 The ADC shift is wrong
 
+*Status: fixed. `ACC_USED_W` is in `fecim_pkg.sv`; `mac-array-spec.md` §9 and
+`protocol.md` §6.5 use it.*
+
 MAC array spec §9 computes `sh = ACC_W - adc_bits` with `ACC_W = 32`. But the accumulator's
 **actual** range is
 
@@ -263,6 +266,9 @@ full-scale is a design choice, and exposing it makes that explicit and sweepable
 Add a verification case: with `adc_bits = ACC_USED_W`, the ADC must be an exact no-op.
 
 ### 6.2 `READ_SIGMA` scaling is documented inconsistently
+
+*Status: fixed. `mac-array-spec.md` §5.3, `protocol.md` §6.3, and the errata now state
+`READ_SIGMA / 512`; `D2D_SIGMA` is `/256` (§4.2).*
 
 MAC array spec §5.3 describes `sigma9` as Q1.8 spanning 0 to 0.996, but the code shifts by 9,
 making the effective range 0 to 0.498. The text and the arithmetic disagree.
