@@ -3,7 +3,7 @@
 **Owner:** Lane C (Ethan Ruddell), with Lane D (Natalie Poche) on parameter sets
 **Feeds:** `device-model.md` (chosen values), `sw/fecim/parameter_sets/*.yaml` (the values
 themselves), `cell-physics-derivation.md`, `model-verification-design.md`, R1 prior art
-**Status:** in progress — week 2
+**Status:** in progress — week 2. §2 extracted.
 
 ---
 
@@ -73,53 +73,143 @@ citation there.
 
 ---
 
-## 2. Dual-port FeFET variability (parameter Set A candidate)
+## 2. Dual-port FeFET variability (parameter Set A)
 
-*Comprehensive Variability Analysis in Dual-Port FeFET for Reliable Multi-Level-Cell Storage.*
-Authors, venue, year, DOI: **TODO — take from the publisher page, not ResearchGate.**
-ResearchGate entry: https://www.researchgate.net/publication/361925449
+S. Chatterjee, S. Thomann, K. Ni, Y. S. Chauhan, and H. Amrouch, "Comprehensive variability
+analysis in dual-port FeFET for reliable multi-level-cell storage," *IEEE Trans. Electron
+Devices*, vol. 69, no. 9, pp. 5316–5323, Sep. 2022, doi: 10.1109/TED.2022.3192808.
 
-**Why it matters:** it reports both variability terms *and* the memory window from one
-process, which is exactly what the single-source provenance rule (`device-model.md` §2)
-needs. Target parameter-set file: `sw/fecim/parameter_sets/dualport_fefet_mlc.yaml`.
+Parameter-set file: `sw/fecim/parameter_sets/dualport_fefet_mlc.yaml`.
+
+**Read this first: the values are TCAD simulation, not measurement.** Sentaurus TCAD,
+calibrated to a measured 22 nm FDSOI transistor and to measured Q–V data from an MFM
+capacitor (their ref. [23]); §II. Variation is modelled as random placement of polarized
+domains (5 nm domains, 400 per device) plus conventional RDF, WFV, and LER via the impedance
+field method, combined by adding variances (Fig. 6). The only measured variability shown is
+Fig. 3, reproduced from Jiang et al., VLSI 2022 (their ref. [14]), on 500 × 500 nm devices.
+**That reference is the candidate for a measured version of this set.**
+
+**What it does not give us:** cycle-to-cycle read noise. §II, last paragraph: the framework
+captures static variation only; stochastic switching and endurance-cycle variation are
+excluded. So it supplies `D2D_SIGMA` and `QUANT_LEVELS` but not `READ_SIGMA`. The earlier
+expectation that it reports both sigmas was wrong.
 
 ### 2.1 Extracted values
 
-Raw quantities only. Copy each into the YAML once it is filled in and checked.
+Raw quantities. Device: asymmetric double-gate (dual-port) HfO2 FeFET, Lg = Wg = 100 nm;
+write on the front gate (FG), read on either FG or back gate (BG).
 
-| Quantity | Value | Units | Location in paper | YAML key | Confidence |
+| Quantity | FG, t_FE 10 nm | BG, t_FE 10 nm | FG, t_FE 3 nm | **BG, t_FE 3 nm (Set A)** | Location |
 |---|---|---|---|---|---|
-| Memory window | | V | | `memory_window_v` | |
-| Distinguishable MLC levels | | count | | `quant_levels` | |
-| Device-to-device V_th spread (σ) | | mV | | `sigma_vth_mv` | |
-| Cycle-to-cycle / read V_th fluctuation (σ) | | mV | | `read_sigma_vth_mv` | |
-| Stuck / failed-cell fraction | | fraction | | `stuck_rate` | `swept` if unreported |
-| Retention (sem. 2) | | | | `retention_decay` | |
+| Write voltage | ±4 V | ±4 V | ±1.8 V | **±1.8 V** | §II; Figs. 4, 10 |
+| Memory window | 1.8 V | 18.5 V | 0.22 V | **2.7 V** | Fig. 4; Fig. 10, §III-B text |
+| σ_HVT, conventional sources only | 18.75 mV | 45.62 mV | 18.95 mV | **48.15 mV** | Fig. 8; Fig. 12 |
+| σ_LVT, conventional sources only | 19.65 mV | 106.05 mV | 19.20 mV | **78.75 mV** | Fig. 8; Fig. 12 |
+| Total σ, worst state | ≈ 45 mV (50 %) | ≈ 0.52 V (70 %) | ≈ 20 mV | **78.75 mV (LVT end)** | Figs. 9b–c, 13b–c, 14; Set A from Fig. 12b, see §2.2 |
+| Max σ / MW | ≈ 0.025 | ≈ 0.028 | ≈ 0.095 | **≈ 0.03** | Figs. 9d, 13d; §III-B text for BG 3 nm |
+| States at P(error) < 1 % | 8 (3 bit) | 8 (3 bit) | 2 (1 bit) | **8 (3 bit)** | §III-C, Fig. 15 |
+| Cycle-to-cycle / read σ | — | — | — | **not reported** | §II |
+| Stuck / failed cells | — | — | — | **not reported** | — |
 
-### 2.2 Conditions to record
+Values marked ≈ are read off plots. Every Set A value in the YAML is a stated number:
+MW 2.7 V (§III-B text, Fig. 10b), 8 states (§III-C, Fig. 15d), σ_LVT 78.75 mV (Fig. 12b).
 
-These go in the YAML `notes` and `process` fields. Without them the values cannot be
-compared across sets.
+**Why BG at 3 nm for Set A:** it is the paper's headline configuration, it has the most
+complete numbers in the text itself, and its σ/MW is nearly flat across states (Fig. 13d),
+so a single `D2D_SIGMA` describes it well. At 10 nm the variability is strongly
+state-dependent (bell-shaped σ/MW in Fig. 9d), which a single σ represents less faithfully.
 
-- Process / node / ferroelectric stack:
-- Device dimensions:
-- Number of devices measured (for σ) and number of cycles (for read noise):
-- Program/erase pulse scheme:
-- Read conditions (V_GS, V_DS, which port is read):
-- Temperature:
-- **Is σ reported per level or pooled across levels?** If per level, record each and note
-  which one goes in the YAML.
-- **Dual-port specifics:** is the V_th that is reported the one seen by the read port? Does the
-  separate write port change how C2C noise should map to `READ_SIGMA`?
+### 2.2 Conditions and mapping notes
+
+- **σ is per state, not pooled.** It peaks at 50 % (FG) or 70 % (BG) switched domains at
+  10 nm; at 3 nm σ/MW rises monotonically from ≈ 0.02 to ≈ 0.03 toward 100 % P_FE+
+  (Fig. 13d). FeCIM has one `D2D_SIGMA` for all levels, so the YAML uses the **worst state**
+  — conservative.
+- **Why 78.75 mV rather than 0.03 × MW = 81 mV.** At 3 nm the worst state is the fully
+  switched (100 % P_FE+, lowest V_TH) end — Fig. 13d is monotonic and Fig. 13a puts the lowest
+  mean V_TH there. §III-A states end states have no domain-placement term, so total σ there is
+  the conventional σ_LVT = 78.75 mV (Fig. 12b). That is a stated value, not a ratio read as
+  "about 0.03", so the confidence is `direct`. Check: 78.75 / 2700 = 0.029.
+- **Subscript typo in §II.** One sentence reads "variations at HVT (σ_LVT) and LVT (σ_HVT)".
+  The LVT assignment above follows the figures, not that sentence.
+- **Levels are a lower bound.** §III-C only evaluates 2, 4, 8, and 16 states; 8 meets
+  P(error) < 1 %, 16 does not (Fig. 15d). The true maximum lies between 8 and 15.
+  `QUANT_LEVELS` accepts any N (`write-path-spec.md` §4.2); 8 understates the device.
+- **Distribution shape:** the paper assumes Gaussian V_TH distributions for its error
+  analysis (§III-C). FeCIM's write-path variation is triangular (`device-model.md` §8). Same
+  σ, different tails — note it when comparing accuracy against their 3-bit result.
+- **Dominant source differs by configuration:** domain randomness dominates at 10 nm;
+  conventional sources (RDF for BG read) dominate at 3 nm (§III-B). Worth one sentence in the
+  report, because it is why σ/MW flattens.
+- **MW and σ come from the same simulated device.** That satisfies the single-source rule,
+  but the confidence column must say simulated. Consider adding a `basis: measured |
+  simulated` field to the `device-model.md` §4 schema so this cannot be lost.
 
 ### 2.3 Sanity check after conversion
 
-Fill in once the values are in. Formulas: `cell-physics-derivation.md` §4.
+Formulas: `cell-physics-derivation.md` §4. Only σ/MW matters, because MW cancels.
 
-- σ_w (D2D) = 255 × σ_Vth / MW = ___ LSB → `D2D_SIGMA` ≈ 2.450 × σ_w = ___ (must be ≤ 255)
-- σ_w (read) = 255 × σ_Vth,rms / MW = ___ LSB → `READ_SIGMA` ≈ 6.93 × σ_w = ___ (must be ≤ 255)
-- If either exceeds 255, the paper's spread is larger than the emulator can represent. Record
-  that here rather than letting the driver clamp it silently.
+- σ_w (D2D) = 255 × 0.07875 / 2.7 = **7.44 LSB** → `D2D_SIGMA` = round(2.450 × 7.44) = **18**
+  (well within 0–255)
+- `QUANT_LEVELS` = 8 → `QUANT_MULT` = round(255 × 256 / 7) = **9326**
+- `READ_SIGMA`: no source value; sweep.
+- For scale: the 10 nm BG worst state (σ/MW ≈ 0.028) gives σ_w ≈ 7.1 LSB, almost the same.
+  The paper's own conclusion — larger MW brings proportionally larger variation — shows up
+  directly as a near-constant `D2D_SIGMA`.
+
+### 2.4 Is this paper representative? Cross-check against other literature
+
+The register value depends only on σ/MW and the level count, so those are what to compare.
+Sources found in the week-2 search; locations are as reported by each paper.
+
+**Device-to-device σ, normalized to memory window**
+
+| Source | Basis | Device | MW | σ_Vth (D2D) | σ/MW | → `D2D_SIGMA` |
+|---|---|---|---|---|---|---|
+| **Set A** — Chatterjee et al., TED 2022 | TCAD | dual-port, 100 × 100 nm, BG read, t_FE 3 nm | 2.7 V | 78.75 mV | 0.029 | 18 |
+| Same paper, other configurations | TCAD | FG/BG read, t_FE 10 nm | 1.8 / 18.5 V | worst-state, Figs. 9b–c | ≈ 0.025 / 0.028 | 16 / 17 |
+| Soliman et al., *Nat. Commun.* 14, 6348 (2023) | **measured**, 32 × 32 array | 28 nm HKMG, 450 × 450 nm cell, 8–10 nm HfO2 | ≥ 1.2 V (4 target V_TH spanning 0.2–1.4 V, Fig. 5) | ≤ 38 mV after write-verify (Results) | ≤ 0.032 | ≤ 20 |
+| Duan et al., IEDM 2024 | measured MW; σ **swept** in simulation | 28 nm, 1FeFET-1C, 128 × 128 | 2.5 V (Fig. 2f) | 0.05–0.3 V swept (Fig. 9b–c) | 0.02–0.12 | 12–75 |
+| De et al., *Front. Nanotechnol.* 2022; arXiv:2008.10363 | measured, calibrated model | HZO Fe-FinFET, L ≈ 40–70 nm | not stated | 578 mV, Gaussian pooled over all states | — | not comparable |
+| Manna et al. (Ni group), arXiv:2312.15444 | measured | 28 nm HKMG, W/L 1/1 down to 0.24/0.24 µm | — | "D2D increases drastically with device scaling" (Fig. 2b, graphical) | — | trend only |
+
+**Levels**
+
+| Source | Levels | Criterion |
+|---|---|---|
+| **Set A** — Chatterjee et al. | ≥ 8 | P(error) < 1 % between Gaussian states (simulated) |
+| Soliman et al. 2023 | 4 | demonstrated in a measured array, with write-verify |
+| Duan et al. 2024 | 4 | demonstrated MLC (Fig. 2g) |
+| De et al. 2022 (Fe-FinFET) | 26–50 per device, 27 in arrays | analog synaptic states for training, not a reliable-read criterion |
+| Manna et al. | ~100 programmable | 20 mV programming steps, not distinguishable states |
+
+**Read / cycle-to-cycle noise** (Set A has none)
+
+| Source | Basis | Value |
+|---|---|---|
+| De et al., arXiv:2008.10363 | measured | C2C σ_Vth = 17.7 mV (during read and write over training) |
+| De et al., arXiv:2103.13302 (Fe-FinFET) | measured | flicker noise σ_Id/I_d ≈ 0.7 %; C2C σ_Id ≈ 1.2 % |
+
+**Verdict**
+
+- **D2D σ: representative.** Set A's σ/MW (0.029) agrees within about 10 % with the only
+  measured array value found (Soliman, ≤ 0.032), and with the same paper's other
+  configurations (0.025–0.028). The two sources disagree on method — TCAD versus measured
+  with write-verify — and still land within 2 `D2D_SIGMA` codes of each other.
+- **But it represents ~100 nm-class devices or write-verified cells only.** Nanoscale FinFETs
+  and unverified scaled devices are far worse (De: 578 mV pooled; Manna: drastic increase with
+  scaling). The `D2D_SIGMA` sweep must therefore extend well above 18 — at least to the
+  σ/MW ≈ 0.12 that Duan et al. sweep (`D2D_SIGMA` ≈ 75).
+- **Levels: plausible, on the optimistic side of measured arrays.** Measured arrays demonstrate 4
+  levels; Set A's 8 is a simulated reliability limit, consistent with the 4-level demos being
+  conservative choices rather than physical limits. Sweep N rather than leaning on 8.
+- **Read noise: still unsourced for Set A.** A measured C2C of ≈ 17.7 mV (De) would map to
+  `READ_SIGMA` ≈ 12 at MW 2.7 V, but it comes from a different device. It informs the **sweep
+  range** only; putting it in Set A would make the set composite (`device-model.md` §2).
+
+**Strongest next sources:** Soliman et al. 2023 as **Set B** (measured; need the MW and
+per-level σ from the full paper's figures) and Jiang et al., VLSI 2022 (measured dual-port
+counterpart to Set A, the paper's ref. [14]).
 
 ---
 
@@ -178,6 +268,9 @@ it reports most of the set, states conditions, and gives spread, not just a mean
 
 | Paper | Process | Reports MW? | D2D σ? | C2C σ? | Levels? | Usable? |
 |---|---|---|---|---|---|---|
-| Dual-port FeFET MLC (§2) | | | | | | Set A candidate |
+| Chatterjee et al., TED 2022 (§2) | 22 nm FDSOI, TCAD | yes | yes | no | yes (≥ 8) | Set A — simulated; C2C missing |
+| Soliman et al., *Nat. Commun.* 2023 | 28 nm HKMG, measured array | partial (V_TH targets) | yes (≤ 38 mV) | no | yes (4) | **Set B candidate** — extract MW and per-level σ from figures |
+| De et al., *Front. Nanotechnol.* 2022 | HZO Fe-FinFET, measured | ? | pooled only | yes (17.7 mV) | analog | read-noise sweep range only |
+| Jiang et al., VLSI 2022 (their ref. [14]) | measured dual-port FeFET | ? | yes (Fig. 3 of §2 paper) | ? | ? | check — measured counterpart to Set A |
 | | | | | | | |
 | | | | | | | |

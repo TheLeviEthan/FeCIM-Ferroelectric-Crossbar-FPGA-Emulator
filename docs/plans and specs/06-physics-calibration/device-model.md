@@ -13,7 +13,9 @@ Every register value that models a device property, with the measurement it came
 reasoning in between, and an honest confidence label.
 
 `cell-physics-derivation.md` gives the mathematics that converts a measurement into a
-register value. This document holds the **chosen values and where they came from**. It is
+register value. This document holds the **chosen values and where they came from**. The
+working notes behind them — what each paper reports and on which page, figure, or table — are
+in `literature-survey.md`. It is
 the project's actual scientific contribution, and it is the table a skeptical reader will
 check first.
 
@@ -63,6 +65,11 @@ that are genuinely well sourced.
 
 One YAML file per source in `sw/fecim/parameter_sets/`. Values below are **placeholders**.
 
+**This section is the normative schema.** `application-spec.md` §4.6 and the
+`parameter_sets/README.md` refer here rather than restating it. Confidence is recorded **per
+parameter**, not once per file — a single paper routinely reports some values directly,
+leaves others to be derived, and omits others entirely.
+
 ```yaml
 name: <short_id>
 source: "<authors>, <venue> <year>, doi:<...>"
@@ -78,11 +85,20 @@ stuck_rate:             null     # fraction of non-programmable cells
 retention_decay:        null     # semester 2
 
 confidence:
+  memory_window_v:      direct
   quant_levels:         direct
   sigma_vth_mv:         direct
   read_sigma_vth_mv:    estimated
   stuck_rate:           swept
+  retention_decay:      swept
 ```
+
+Store **raw device quantities** (volts, mV, counts, fractions), never register values. The
+driver converts at load time using §5, so a conversion change never leaves stale register
+values in a data file.
+
+**State whether a source is measured or simulated** in `notes`. TCAD-derived values are
+legitimate inputs but must never be presented as measured device data.
 
 `null` is meaningful: it forces the sweep path in §6 rather than permitting a silent guess.
 
@@ -142,7 +158,7 @@ any single set is just a configuration.
 
 | Slot | Process | Status |
 |---|---|---|
-| Set A | TBD | survey in progress |
+| Set A | `dualport_fefet_mlc` — Chatterjee et al., IEEE TED 2022: dual-port HfO2 FeFET, 22 nm FDSOI, t_FE = 3 nm, BG read. **TCAD-simulated.** MW 2.7 V, ≥ 8 levels, σ_Vth 78.75 mV (→ `D2D_SIGMA` 18); read noise not reported (swept). σ/MW cross-checked against measured 28 nm arrays (`literature-survey.md` §2.4). Notes: `literature-survey.md` §2 | values extracted |
 | Set B | TBD | survey in progress |
 | Set C | TBD | survey in progress |
 
@@ -185,12 +201,13 @@ having it pointed out.
 **I–V nonlinearity is not modelled.** The exact integer multiply corresponds to a linearized
 read scheme: pulse-width-encoded activations at fixed $V_{DS}$, or a series resistor
 dominating cell conductance as in 1FeFET-1R. NeuroSim and AIHWKit both model the
-nonlinearity. Known gap, and a strong semester-2 addition — structurally identical to
+nonlinearity (NeuroSim V1.5 specifics: `literature-survey.md` §1.2). Known gap, and a strong semester-2 addition — structurally identical to
 `atten_rom`.
 
 **Single-conversion readout.** The model quantizes the full column sum once. Bit-serial
 readout quantizes once per bit plane and shift-adds, which produces a different accuracy
-curve at the same `ADC_BITS`. Documented alternative, not modelled.
+curve at the same `ADC_BITS`. Documented alternative, not modelled (NeuroSim V1.5 models it:
+`literature-survey.md` §1.2).
 
 **IR drop is row-position-dependent only.** A rigorous treatment depends on total column
 current and is input-dependent. The approximation is what permits the one-multiplier
