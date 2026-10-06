@@ -234,18 +234,32 @@ curve looks odd, and the answer will be in the metadata or nowhere.
 
 ### 4.6 Parameter sets are version-controlled data
 
-One file per published source in `sw/fecim/parameter_sets/`, with the citation inside:
+One file per published source in `sw/fecim/parameter_sets/`, with the citation inside. The
+schema is defined in `device-model.md` §4; this is an illustrative instance (values are not
+from a real paper):
 
 ```yaml
 name: gf28_hkmg
 source: "Author et al., IEEE TED 2022, doi:10.1109/..."
-confidence: direct
+process: "28 nm HKMG"
+composite: false
+notes: "measurement conditions"
+
 memory_window_v: 1.0
 quant_levels: 8
 sigma_vth_mv: 50
 read_sigma_vth_mv: 3
 stuck_rate: null        # not reported — sweep as a band
+
+confidence:             # per parameter, not per file
+  memory_window_v: direct
+  quant_levels: direct
+  sigma_vth_mv: direct
+  read_sigma_vth_mv: estimated
+  stuck_rate: swept
 ```
+
+The loader rejects a file in which any non-null value lacks a confidence label.
 
 Never values typed into a script. `confidence` and `null` for unreported parameters carry
 the provenance discipline from `model-verification-design.md` §7.3 into the code, so a
