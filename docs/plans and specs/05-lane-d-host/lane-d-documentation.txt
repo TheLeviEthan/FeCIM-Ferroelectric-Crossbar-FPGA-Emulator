@@ -1,0 +1,40 @@
+Hardware-aware training for large-scale and diverse deep learning inference workloads
+using in-memory computing-based accelerators
+Nature Communications, 2023 · DOI: 10.1038/s41467-023-40770-4
+https://www.nature.com/articles/s41467-023-40770-4
+
+Extract: their quantization and weight-mapping flow, directly relevant to
+application-spec.md §2. Also the attribution finding — exactly the kind of result our
+NOISE_EN isolation is built to produce. Open access.
+
+- Infinite number of states, breaking it into divisions so there is a finite number of states to choose from.
+
+Extracted Quantization and Weight-Mapping flow:
+1. First DDNs are trained in 32-bit floating point then retrained in a hardware-aware manner, 
+by adding nonidealities and noise sources into the forward path and using SGD to improve the 
+robustness to such generic nonidealities. HWA training is only performed once—no specific 
+device or chip characteristics, such as failure maps, are taken into account during HWA 
+training, so resulting models remain widely deployable. This HWA-trained model is then programmed
+onto AIMC multiple times (here insimulation) and DNN accuracy is eva luated over time, taking into
+account conductance drift of PCM devices and read noise accumulation
+
+First demonstration of in-memory computing crossbar using multi-level Cell FeFET
+Soliman, T., Chatterjee, S., Laleni, N., Müller, F., Kirchner, T., Wehn, N., Kämpfe, T.,
+Chauhan, Y. S., Amrouch, H.
+Nature Communications, vol. 14, Oct 2023 · DOI: 10.1038/s41467-023-42110-y
+https://www.nature.com/articles/s41467-023-42110-y
+PMC: https://pmc.ncbi.nlm.nih.gov/articles/PMC10564859/
+
+Extract: number of levels, device variation, and why the series resistor is there — it
+linearizes the cell, which is the assumption our exact-multiply model depends on
+(device-model.md §8). Note also that they use time-encoded activation, matching the
+pulse-width scheme our model assumes. Open access.
+
+
+DNN+NeuroSim V2.0: An End-to-End Benchmarking Framework for Compute-in-Memory
+arXiv:2003.06471 · https://arxiv.org/abs/2003.06471 · PDF: https://arxiv.org/pdf/2003.06471
+
+Read the weight-mapping and ADC-quantization sections. They sweep ADC precision from 3 to 5
+bits across 1-, 2-, and 4-bit cells.
+Extract: sweep methodology and result presentation — a useful template for our own
+harness, and a baseline to compare our accuracy curves against. Open access.
