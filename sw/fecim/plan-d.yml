@@ -1,0 +1,18 @@
+name: soliman_natcomms_2023
+source: "Soliman, Chatterjee, Laleni et al., Nature Communications 2023, doi:10.1038/s41467-023-42110-y"
+process: "28 nm high-k/metal-gate (HKMG) technology"
+composite: false
+notes: "1FeFET-1R configuration with 1 MOhm series resistor; 4 distinct target states (2-bit); measured D2D V_th spread up to 38 mV (40 mV assumed in simulation)"
+
+memory_window_v:        1.2      # MW, volts (target V_th range from 0.3 V to 1.5 V)
+quant_levels:           4        # N distinguishable states (2-bit storage)
+sigma_vth_mv:           38       # device-to-device V_th spread (measured max standard deviation)
+read_sigma_vth_mv:      null     # cycle-to-cycle V_th fluctuation (not explicitly reported)
+stuck_rate:             null     # fraction of non-programmable cells (not reported — sweep as a band)
+retention_decay:        null     # semester 2 (10-year retention demonstrated qualitatively)
+
+confidence:
+  quant_levels:         direct
+  sigma_vth_mv:         direct
+  read_sigma_vth_mv:    estimated
+  stuck_rate:           swept
