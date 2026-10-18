@@ -26,6 +26,7 @@ endif()
 # ---- core library ---------------------------------------------------------
 add_library(fecim_model
     src/primitives.cpp
+    src/write_path.cpp
     src/model_exact.cpp
 )
 target_include_directories(fecim_model PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -36,6 +37,7 @@ target_compile_options(fecim_model PRIVATE ${FECIM_WARNINGS})
 add_executable(model_tests
     tests/test_main.cpp
     tests/test_primitives.cpp
+    tests/test_write_path.cpp
     tests/test_model.cpp
 )
 target_link_libraries(model_tests PRIVATE fecim_model)

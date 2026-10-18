@@ -5,10 +5,11 @@
 // for the rules (integer only, same clamps, same rounding, LFSR advances on
 // accumulate only).
 //
-// SKELETON (week 1): the clean path is implemented. Every non-ideality is a
-// TODO, and compute() throws if one is enabled, rather than silently
-// returning clean results that would make an L1/L2 comparison pass
-// for the wrong reason.
+// STATUS (week 2): the clean path and conductance quantization
+// (NOISE_QUANT, write-path stage 1, arithmetic in fecim/write_path.h) are
+// implemented. Every other non-ideality is a TODO, and compute() throws if
+// one is enabled, rather than silently returning clean results that would
+// make an L1/L2 comparison pass for the wrong reason.
 
 #pragma once
 
