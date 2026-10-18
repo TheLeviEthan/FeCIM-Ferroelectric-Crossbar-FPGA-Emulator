@@ -274,3 +274,101 @@ it reports most of the set, states conditions, and gives spread, not just a mean
 | Jiang et al., VLSI 2022 (their ref. [14]) | measured dual-port FeFET | ? | yes (Fig. 3 of §2 paper) | ? | ? | check — measured counterpart to Set A |
 | | | | | | | |
 | | | | | | | |
+
+---
+
+## 5. IBM Analog Hardware Acceleration Kit (AIHWKit) tutorial
+
+M. Le Gallo *et al.*, "Using the IBM analog in-memory hardware acceleration kit for neural
+network training and inference," *APL Mach. Learn.*, vol. 1, no. 4, Art. no. 041102, 2023,
+doi: 10.1063/5.0168089. Open access (CC BY 4.0). Published online 28 Nov 2023.
+
+**Why it matters:** AIHWKit is the most complete actively maintained AIMC simulator (their
+Table I), and the tool a reviewer is most likely to ask "why not just use that?" about. It
+also gives typical values and modelling conventions to check FeCIM's register set against.
+
+### 5.1 Domain and prior art
+
+- **Field framing (§I, §II-A):** AIMC with NVM crossbars (PCM, ReRAM, MRAM, EcRAM, capacitors,
+  Flash, FeFET, FTJ, photonic). Projected 40–140× energy efficiency over an NVIDIA A100 for a
+  full AIMC accelerator (§I, their ref. 14). States that no "optimal" device exists yet.
+- **Simulator landscape (Table I):** NeuroSim (2017), XB-SIM (2019), MemTorch (2020),
+  AIHWKit (2021), CrossSim (2022); only NeuroSim, AIHWKit, and CrossSim actively maintained.
+  NeuroSim and XB-SIM offer performance estimation; AIHWKit does not (§I, §VIII). SPICE-level
+  simulators are excluded from the comparison.
+- **Self-described scope (§I):** "focuses on the algorithmic and functional levels as opposed
+  to hardware and circuit design levels." It is a PyTorch library with a C++/CUDA backend.
+- **Device coverage (Fig. 1b, Table X):** hardware-calibrated models for PCM, ReRAM, EcRAM,
+  and CMOS capacitor cells. **FeFET is listed as a candidate technology (§I) but has no
+  calibrated model or preset.**
+- **Also offers real hardware access** through the Analog AI Cloud Composer (§VI-D) — IBM
+  PCM chips, not FeFET.
+- **Bit slicing is not supported natively** (§III-D-1) and is listed as future work (§VIII).
+
+**How FeCIM differs, honestly stated:**
+
+| Claim | Holds against AIHWKit? |
+|---|---|
+| Per-effect isolation of non-idealities | **No.** AIHWKit exposes every effect separately through `RPUConfig` (Tables IV–V). Do not claim this as unique. |
+| Faster than software simulation | **No, not as built.** AIHWKit is GPU-accelerated; FeCIM is host-link-bound (~1.4 s per 128×128 weight load at 115200 baud). Do not claim speed. |
+| FeFET-specific, provenance-tracked calibration | **Yes.** No FeFET preset exists in AIHWKit. |
+| Bit-exact hardware datapath with real integer arithmetic, timing, and resource cost | **Yes.** AIHWKit is functional-level and has no performance estimation (§VIII). |
+| Low-cost, physical, open hardware artifact | **Yes.** |
+| Hardware-aware training | **AIHWKit only.** FeCIM is inference-only on digitally trained (or externally HWA-trained) weights. Complementary, not competing. |
+
+### 5.2 Modelling conventions and typical values
+
+| AIHWKit concept | Location | Typical value | FeCIM equivalent |
+|---|---|---|---|
+| Programming noise, σ depends on target conductance | §IV-A-1a, Eq. (3) | per device model | `D2D_SIGMA`, but one σ for all levels |
+| Short-term weight (read) noise, resampled every MVM | §III-D-3, Table V–VI | `w_noise` 0.01 (normalized), additive constant | `READ_SIGMA`, per cell per MVM; 0.01 × 127 LSB ≈ 1.27 LSB → `READ_SIGMA` ≈ 9 |
+| Low-frequency 1/f / RTN read noise, resampled once per inference time | §IV-A-1c, Eq. (5) | per device model | not modelled |
+| Output (peripheral) noise, weight-independent | §III-D-2, Eq. (1) | `out_noise` 0.04 | **not modelled** |
+| DAC resolution | §III-D-4, Table V | `inp_res` 254 (≈ 8 bit) | 8-bit activations — matches |
+| ADC resolution | §III-D-4, Table V | `out_res` 254 (≈ 8 bit) | `ADC_BITS` |
+| ADC full scale / saturation | §III-D-4, Table V | `out_bound` 10: saturates at the current of 10 max inputs × max weights | **fixed at worst case (`ACC_USED_W`)** |
+| IR drop, per bit line, input-dependent, quadratic approximation | §III-D-5 | 5 µS max conductance, 0.35 Ω wire | `atten_rom`, row-position only |
+| Stuck on/off devices | §II-B | — | `STUCK_RATE` |
+| Differential pair per weight | §II-B | ≥ 2 devices | one signed quantity (`device-model.md` §8) |
+| Noise / bound management | §III-D-6 | "typically disabled … not supported in typical AIMC inference chips" | not modelled — consistent |
+| Drift and global drift compensation | §IV-A-1b, §IV-A-2, Eq. (4) | PCM-specific | retention, semester 2 |
+| Evaluation repeats | §IV-C-1 | "at least ten times (we typically use 25)" | sweep seeds |
+
+### 5.3 Implications for FeCIM design choices
+
+Ordered by impact. None is applied yet; each needs a team decision.
+
+1. **ADC full scale is set too wide to be realistic.** FeCIM quantizes over the worst-case
+   accumulator range. For random 128-row tiles (uniform weights ±127, activations 0–255), the
+   column-sum σ is ≈ 1.2 × 10⁵, which is **≈ 1.8 LSB at 8 ADC bits** and ≈ 0.5 LSB at 6 bits
+   (≈ 1.3 LSB at 8 bits with 50 % zero activations). An 8-bit ADC therefore behaves like a
+   2–3-bit one, and ADC sweeps would mostly measure the full-scale choice. AIHWKit's
+   `out_bound` = 10 sets full scale at a small fraction of the worst case and saturates beyond
+   it. **Recommendation:** assign a reserved register (`0x10`–`0x1F`, no wire-version bump per
+   protocol §8) for an ADC full-scale reduction, with saturation at the reduced bound. This
+   revisits the `ADC_BITS`-only decision in `consistency-audit.md` §3 with new evidence;
+   `cell-physics-derivation.md` §6.1 already suggested it.
+2. **IR-drop "unity" is not unity.** `atten_rom` resets to 255 (Q0.8 = 0.996) and the path
+   computes `(act × atten) >> 8`. With coefficient 255 this returns act − 1 for every non-zero
+   activation (1 → 0, 255 → 254). Enabling `NOISE_EN[4]` with the reset table therefore
+   injects a systematic bias, contrary to protocol §4.2b ("effectively no attenuation").
+   **Recommendation:** store the *drop* instead — `act_atten = act − ((act × d) >> 8)`, reset
+   `d = 0` — which is exactly unity at reset and keeps the multiply 9×9 signed. This changes
+   the meaning of the `WRITE_ATTEN` payload, so it is a protocol change for all four members.
+3. **Output noise is missing.** AIHWKit treats weight-independent peripheral noise as a core
+   MVM non-ideality (Eq. 1). It could be added cheaply as one shared generator at the drain-chain
+   output, like the ADC, with its σ in a reserved register. Semester-2 candidate.
+4. **IR-drop magnitude for sweeps.** With AIHWKit's default wire parameters, a back-of-envelope
+   worst case for 128 rows all on is N²/2 × R_wire × G_max ≈ 1.4 % at the far row. In Q0.8 that
+   is only ~4 codes across the whole column, so FeCIM resolves severe IR drop (κ ≳ 5 %) well
+   and realistic small drops coarsely. Sweep κ from ≈ 1 % upward and say so. (Estimate assumes
+   PCM-like 5 µS cells; recompute for FeFET read currents.)
+5. **σ depends on the programmed level** in AIHWKit (Eq. 3) and in Chatterjee et al. (§2).
+   FeCIM's single `D2D_SIGMA` uses the worst level. A per-level σ table (≤ 255 × 8 bits,
+   written like `atten_rom`) is a possible semester-2 refinement.
+6. **Evaluation methodology:** use ≥ 10 seeds per sweep point (25 preferred), report mean
+   ± std, and present sweeps as multiples of the calibrated value — the "noise factor"
+   approach of their Fig. 10b. `application-spec.md` §4.5's example uses 3 seeds.
+7. **Weight mapping:** AIHWKit maps the largest |w| to full conductance with a digital output
+   scale per tile or per column (§III-D-1b). FeCIM's host quantizer should use per-column
+   scales: free in software, and it uses the full 8-bit range per column.
