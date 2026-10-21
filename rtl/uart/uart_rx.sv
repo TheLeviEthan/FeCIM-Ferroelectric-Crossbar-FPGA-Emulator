@@ -9,7 +9,7 @@ module uart_rx (
     logic [3:0] phase;
     logic [2:0] bit_idx;
     logic [7:0] shift_data;
-    logic [2:0] samples;
+    logic [1:0] samples;
     logic voted;
     assign voted = (samples[0] & samples[1]) |
                    (samples[0] & rx_sync[2]) |
