@@ -48,6 +48,8 @@ jobs:
         # place generated files in the build directory
         run: cmake -S model -B build && cmake --build build
       - name: Run model tests
+      - name: Check mac_lane golden vectors are current
+        run: python3 tb/golden/mac_lane/gen_mac_lane_vectors.py --check
         run: ./build/model_tests
 
 # cycle by cycle EQUIVALENCE CHECK on entire datapath with stochasticity turned off
