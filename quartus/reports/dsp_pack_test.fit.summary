@@ -1,0 +1,18 @@
+Fitter Status : Successful - Thu Oct 22 00:59:09 2026
+Quartus Prime Version : 25.1std.0 Build 1129 10/21/2025 SC Lite Edition
+Revision Name : dsp_pack_test
+Top-level Entity Name : dsp_pack_test
+Family : MAX 10
+Device : 10M50DAF484C7G
+Timing Models : Final
+Total logic elements : 1 / 49,760 ( < 1 % )
+    Total combinational functions : 1 / 49,760 ( < 1 % )
+    Dedicated logic registers : 0 / 49,760 ( 0 % )
+Total registers : 0
+Total pins : 1 / 360 ( < 1 % )
+Total virtual pins : 63
+Total memory bits : 0 / 1,677,312 ( 0 % )
+Embedded Multiplier 9-bit elements : 2 / 288 ( < 1 % )
+Total PLLs : 0 / 4 ( 0 % )
+UFM blocks : 0 / 1 ( 0 % )
+ADC blocks : 0 / 2 ( 0 % )
