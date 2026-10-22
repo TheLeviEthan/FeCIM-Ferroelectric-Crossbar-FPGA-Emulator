@@ -49,6 +49,10 @@ jobs:
         run: cmake -S model -B build && cmake --build build
       - name: Run model tests
         run: ./build/model_tests
+      # golden vectors are committed files; fail if someone edited the
+      # generator (or fecim_pkg.sv geometry) without regenerating them
+      - name: Check mac_lane golden vectors are current
+        run: python3 tb/golden/mac_lane/gen_mac_lane_vectors.py --check
 
 # cycle by cycle EQUIVALENCE CHECK on entire datapath with stochasticity turned off
 # both the Verilated RTL and C++ model live in one process as C++ objects
