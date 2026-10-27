@@ -1,38 +1,33 @@
-//=============================================================================
-// uart_tx.sv -- Lane A
-//
-// UART transmitter, 8N1, LSB first. No FIFO -- tx_busy handshake.
-// Spec: uart-spec.md §5
-//
-// SKELETON. Port list is provisional -- confirm against the spec and the
-// frozen A/B seam (top-level-spec §7.1) before implementing. Outputs are
-// tied to safe idle values so the top level elaborates and lints cleanly.
-//
-// TODO(lane a): implement, then DELETE the lint waivers below. They
-// exist only because a skeleton's inputs are unused; leaving them in place
-// after implementation hides real -Wall findings.
-//=============================================================================
-
-/* verilator lint_off UNUSEDSIGNAL */
-/* verilator lint_off UNUSEDPARAM */
-
-module uart_tx
-    import fecim_pkg::*;
-(
-    input  logic       clk,
-    input  logic       rst_n,
-    input  logic       tick_16x,
-    input  logic [7:0] tx_data,        // captured on tx_start
-    input  logic       tx_start,       // single-cycle, ignored while busy
-    output logic       tx_busy,
-    output logic       txd             // to pin, idle HIGH
+module uart_tx (
+    input logic clk, rst_n, tick_16x,
+    input logic [7:0] tx_data,
+    input logic tx_start,
+    output logic tx_busy,
+    output logic txd
 );
-
-    // TODO: txd must reset to 1 -- a low reset looks like a start bit.
-    assign tx_busy = 1'b0;
-    assign txd     = 1'b1;
-
-endmodule : uart_tx
-
-/* verilator lint_on UNUSEDPARAM */
-/* verilator lint_on UNUSEDSIGNAL */
+    logic [9:0] frame;
+    logic [3:0] bit_idx, tick_idx;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            frame <= 10'h3ff; bit_idx <= 0; tick_idx <= 0;
+            tx_busy <= 0; txd <= 1;
+        end else if (!tx_busy) begin
+            txd <= 1;
+            if (tx_start) begin
+                frame <= {1'b1, tx_data, 1'b0};
+                bit_idx <= 0; tick_idx <= 0;
+                tx_busy <= 1; txd <= 0;
+            end
+        end else if (tick_16x) begin
+            if (tick_idx == 15) begin
+                tick_idx <= 0;
+                if (bit_idx == 9) begin
+                    tx_busy <= 0; txd <= 1;
+                end else begin
+                    bit_idx <= bit_idx + 1'b1;
+                    txd <= frame[bit_idx + 1'b1];
+                end
+            end else tick_idx <= tick_idx + 1'b1;
+        end
+    end
+endmodule

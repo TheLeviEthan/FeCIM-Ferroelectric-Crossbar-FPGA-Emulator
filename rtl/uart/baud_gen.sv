@@ -1,27 +1,47 @@
-//=============================================================================
-// baud_gen.sv -- Lane A
-//
-// Fractional (phase-accumulator) 16x baud tick generator.
-//   baud_inc = round(2^16 * 16 * baud / CLK_HZ)
-// See uart-spec §3.2 and rtl-conventions §4.1.
-//=============================================================================
 
-module baud_gen
-    import fecim_pkg::*;
-(
-    input  logic                  clk,
-    input  logic                  rst_n,
-    input  logic [BAUD_ACC_W-1:0] baud_inc,
-    output logic                  tick_16x
+// ============================================================================
+// baud_gen.sv
+// FeCIM Ferroelectric Crossbar FPGA Emulator
+//
+// 16-bit fractional baud-rate generator
+// Clock: 50 MHz
+// Output: 16x UART oversampling tick
+//
+// Baud increment formula:
+//   baud_inc = round(baud_rate * 16 * 65536 / 50_000_000)
+//
+// Examples:
+//   115200 baud -> 2416
+//   230400 baud -> 4832
+//   460800 baud -> 9664
+//   921600 baud -> 19327
+// ============================================================================
+
+module baud_gen (
+    input  logic        clk,
+    input  logic        rst_n,
+    input  logic [15:0] baud_inc,
+    output logic        tick_16x
 );
 
-    logic [BAUD_ACC_W:0] acc;
+    // 16-bit phase accumulator
+    logic [15:0] phase;
 
+    // 17-bit sum to preserve carry
+    logic [16:0] phase_sum;
+
+    // Add programmable baud increment
+    assign phase_sum = {1'b0, phase} + {1'b0, baud_inc};
+
+    // Generate one-clock-wide tick on accumulator overflow
     always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) acc <= '0;
-        else        acc <= {1'b0, acc[BAUD_ACC_W-1:0]} + {1'b0, baud_inc};
+        if (!rst_n) begin
+            phase    <= 16'd0;
+            tick_16x <= 1'b0;
+        end else begin
+            phase    <= phase_sum[15:0];
+            tick_16x <= phase_sum[16];
+        end
     end
 
-    assign tick_16x = acc[BAUD_ACC_W];
-
-endmodule : baud_gen
+endmodule
