@@ -2,6 +2,8 @@
 
 #include <stdexcept>
 
+#include "fecim/write_path.h"
+
 namespace fecim {
 
 namespace {
@@ -34,8 +36,22 @@ void ModelExact::set_config(const Config& cfg) {
 void ModelExact::write_weight(int row, int col, std::int8_t w) {
     check_row(row);
     check_col(col);
-    // TODO(lane C): write-path transform (quant, d2d via cell_hash16 on the
-    // GLOBAL cell address, stuck-at). Applied at write time, as in the RTL.
+    // Write-path transform, in the RTL's stage order (write-path-spec §3).
+    // Applied once, at write time, with the config in effect NOW: changing
+    // quant_levels later does not re-quantize cells already written, exactly
+    // as in the RTL. With every enable clear this is a pure pass-through,
+    // which is what the L0 gate depends on.
+    //
+    // Stage 1 uses the QUANT_MULT *register* value, not
+    // quant_mult_for(quant_levels): the RTL uses whatever the host wrote,
+    // so the model must too, even for a mismatched pair.
+    if (cfg_.noise_en & NOISE_QUANT)
+        w = quantize_weight(w,
+                            static_cast<std::uint8_t>(cfg_.quant_levels),
+                            cfg_.quant_mult);
+    // TODO(lane C, week 3): stage 2, d2d via cell_hash16 on the GLOBAL cell
+    //                       address (col * TILE_ROWS + row).
+    // TODO(lane C, week 3): stage 3, stuck-at. Overrides stages 1 and 2.
     weights_[widx(row, col)] = w;
 }
 
@@ -56,7 +72,15 @@ std::int8_t ModelExact::stored_weight(int row, int col) const {
 }
 
 std::vector<std::int32_t> ModelExact::compute() {
-    if (cfg_.noise_en != NOISE_NONE)
+    // Non-idealities implemented so far. Anything else still throws rather
+    // than silently returning clean results, which would let an L1/L2
+    // comparison pass for the wrong reason. Add each bit as it lands.
+    //
+    // Quant needs nothing in this function: it was applied to the stored
+    // weights in write_weight(), so the clean MAC loop below is already
+    // correct for it.
+    constexpr unsigned kImplemented = NOISE_QUANT;
+    if ((static_cast<unsigned>(cfg_.noise_en) & ~kImplemented) != 0u)
         throw std::logic_error("model_exact: non-idealities not implemented yet");
 
     // Clean path. Integer addition is associative, so row order does not

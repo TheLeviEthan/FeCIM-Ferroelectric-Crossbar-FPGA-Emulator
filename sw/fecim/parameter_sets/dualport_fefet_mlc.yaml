@@ -1,0 +1,39 @@
+# FeCIM parameter set — schema: docs/plans and specs/06-physics-calibration/device-model.md §4
+#
+# Raw device quantities only. The driver converts them to register values
+# (cell-physics-derivation.md §4). Source locations for every value are in
+# docs/plans and specs/06-physics-calibration/literature-survey.md §2.
+
+name: dualport_fefet_mlc
+source: "S. Chatterjee, S. Thomann, K. Ni, Y. S. Chauhan, H. Amrouch, IEEE Trans. Electron Devices, vol. 69, no. 9, pp. 5316-5323, 2022, doi:10.1109/TED.2022.3192808"
+process: "Asymmetric double-gate (dual-port) HfO2 FeFET on 22 nm FDSOI; t_FE = 3 nm, write voltage 1.8 V, back-gate (BG) read; Lg = Wg = 100 nm"
+composite: false
+notes: >-
+  TCAD SIMULATION, not measurement: Sentaurus, calibrated to measured 22 nm FDSOI
+  transistor and MFM capacitor data (paper ref. [23]). Static variation only (random
+  ferroelectric domain placement + RDF, WFV, LER); the paper explicitly excludes
+  cycle-to-cycle and switching dynamics, so read noise is unreported. sigma_vth_mv is the
+  worst state, which at t_FE = 3 nm is the fully switched LVT end (STD/MW rises
+  monotonically to 100% P_FE+, Fig. 13d; end states carry no domain-placement term,
+  Sec. III-A), so total sigma there = sigma_LVT = 78.75 mV (Fig. 12b); 78.75/2700 = 0.029,
+  matching "about 0.03" in Sec. III-B. Note Sec. II swaps the HVT/LVT subscripts in one
+  sentence; the LVT assignment here follows Fig. 13a. quant_levels is a LOWER BOUND: Sec.
+  III-C tests only 2, 4, 8, 16 states; 8 passes P(error) < 1% and 16 fails (Fig. 15d), so
+  the true maximum is 8-15. Cross-checked against measured literature in
+  literature-survey.md Sec. 2.4: sigma/MW agrees with measured 28 nm FeFET arrays. Alternative configurations from the same paper
+  (FG/BG read, t_FE = 10 nm) are listed in literature-survey.md Sec. 2.1.
+
+memory_window_v:        2.7      # BG read, t_FE = 3 nm (Sec. III-B text, Fig. 10b)
+quant_levels:           8        # 3 bits at P(error) < 1%; lower bound, 16 not met (Sec. III-C, Fig. 15d)
+sigma_vth_mv:           78.75    # worst state = LVT end, sigma_LVT (Fig. 12b; Sec. III-A, Fig. 13d)
+read_sigma_vth_mv:      null     # not reported: static-only framework (Sec. II, last para.)
+stuck_rate:             null     # not reported
+retention_decay:        null     # not reported
+
+confidence:
+  memory_window_v:      direct
+  quant_levels:         direct
+  sigma_vth_mv:         direct
+  read_sigma_vth_mv:    swept
+  stuck_rate:           swept
+  retention_decay:      swept
