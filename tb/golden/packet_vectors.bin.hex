@@ -1,0 +1,13 @@
+Format: Hex-encoded binary payload stream matching packet specification v1.0
+
+[1B Header: 0xA5] [1B Cmd: 0x01 WRITE] [2B Addr: 0x0004 (LE)] [4B Payload: 0x12345678 (LE)] [2B CRC16-CCITT: 0x48D7 (LE)]
+
+A5 01 04 00 78 56 34 12 D7 48
+
+[1B Header: 0xA5] [1B Cmd: 0x02 READ]  [2B Addr: 0x0010 (LE)] [4B Payload: 0x00000000 (LE)] [2B CRC16-CCITT: 0x111E (LE)]
+
+A5 02 10 00 00 00 00 00 1E 11
+
+[1B Header: 0xA5] [1B Cmd: 0x03 EXEC]  [2B Addr: 0x0000 (LE)] [4B Payload: 0x00000001 (LE)] [2B CRC16-CCITT: 0x5EE8 (LE)]
+
+A5 03 00 00 01 00 00 00 E8 5E
