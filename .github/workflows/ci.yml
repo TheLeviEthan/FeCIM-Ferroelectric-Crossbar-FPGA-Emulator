@@ -12,13 +12,17 @@ on:        # push fires on every branch; pull_request fires on PR open/update
 # each job will run in parallel on its own VM:
 
 jobs:
+# runs-on is pinned to ubuntu-24.04, not ubuntu-latest: -latest moves to
+# Ubuntu 26.04 (from 19 Oct 2026), whose apt Verilator is newer than the
+# 5.020 everything was verified against. Newer Verilator adds -Wall checks,
+# so lint could go red with no RTL change. Upgrade deliberately, not by drift.
 # linting - statically check code for syntax, style, and potential errors
 # prevents merging code that fails static analysis
 # "second line of defense" after local development checks
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install Verilator   # required for linting system verilog
         run: sudo apt-get update && sudo apt-get install -y verilator
       - name: Lint RTL    # name of the test to be run
@@ -68,9 +72,9 @@ jobs:
 
 # model - build and run model tests
   model:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Configure and build model
         # read model/CMakeLists.txt to configure build
         # place generated files in the build directory
@@ -86,27 +90,58 @@ jobs:
 # both the Verilated RTL and C++ model live in one process as C++ objects
 # runs the co-simulation harness to perform the equivalence check
   cosim:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      # GATE: skip (green, with a notice) until the week-4 harness lands.
+        # A job-level `if:` cannot see repo files (it runs before checkout),
+        # so a step checks and the rest key off its output.
+        # REMOVE THIS GATE once the harness is merged: after that, a missing
+        # Makefile is a real failure, and a skip would hide the L0 gate.
+      - name: Check co-simulation harness exists
+        id: gate
+        run: |
+          if [ -f model/cosim/Makefile ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::cosim skipped: model/cosim/Makefile not on this branch yet (week-4 harness)"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Install Verilator
+        if: steps.gate.outputs.ready == 'true'
         run: sudo apt-get update && sudo apt-get install -y verilator
       - name: Build co-simulation harness
+        if: steps.gate.outputs.ready == 'true'
         run: make -C model/cosim
       - name: Run L0 bit-exact gate
+        if: steps.gate.outputs.ready == 'true'
         run: ./model/cosim/run_l0
 
 # Python tests for the software package
 # check Python code for syntax, style, and potential errors
 # run all Python tests in sw test directory
   python:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      # GATE: skip (green, with a notice) until Lane D's package is merged.
+        # REMOVE THIS GATE once sw/pyproject.toml is on main.
+      - name: Check Python package exists
+        id: gate
+        run: |
+          if [ -f sw/pyproject.toml ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::python skipped: sw/pyproject.toml not on this branch yet (Lane D package)"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-python@v6
+        if: steps.gate.outputs.ready == 'true'
         with:
           python-version: '3.11'
       - name: Install package and test dependencies
+        if: steps.gate.outputs.ready == 'true'
         run: pip install -e './sw[test]'
       - name: Run Python tests
+        if: steps.gate.outputs.ready == 'true'
         run: pytest sw/tests
