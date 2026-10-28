@@ -37,6 +37,34 @@ jobs:
           verilator --lint-only -Wall --top-module fecim_top \
             rtl/fecim_pkg.sv $(find rtl -name '*.sv' -not -name 'fecim_pkg.sv')
 
+      # Standalone lint of the week-2 leaf modules, one step per module so a
+        # failure names the module (and so the owning lane) in the Actions UI.
+        # The full-design lint above only checks each module as fecim_top
+        # happens to wire it; these check it against its own port list.
+        # `if: !cancelled()` runs every step even when an earlier one fails,
+        # so one broken module does not hide the status of the others.
+        # -y adds each rtl/ subdirectory to the library path, so Verilator
+        # finds submodules by file name (mac_lane pulls in read_noise.sv)
+        # without parsing the rest of the design.
+      - name: Collect RTL library directories
+        run: echo "RTL_LIBS=$(find rtl -mindepth 1 -type d -printf '-y %p ')" >> "$GITHUB_ENV"
+      # Lane A (Zhiting): UART
+      - name: Lint baud_gen (standalone)
+        if: ${{ !cancelled() }}
+        run: verilator --lint-only -Wall --top-module baud_gen $RTL_LIBS rtl/fecim_pkg.sv rtl/uart/baud_gen.sv
+      - name: Lint uart_rx (standalone)
+        if: ${{ !cancelled() }}
+        run: verilator --lint-only -Wall --top-module uart_rx $RTL_LIBS rtl/fecim_pkg.sv rtl/uart/uart_rx.sv
+      - name: Lint uart_tx (standalone)
+        if: ${{ !cancelled() }}
+        run: verilator --lint-only -Wall --top-module uart_tx $RTL_LIBS rtl/fecim_pkg.sv rtl/uart/uart_tx.sv
+      # Lane B (Megan): MAC lane. NOTE: while mac_lane.sv still carries its
+        # skeleton lint_off waivers, UNUSEDSIGNAL/UNUSEDPARAM are suppressed
+        # here too; this step only gains its full teeth once they are deleted.
+      - name: Lint mac_lane (standalone)
+        if: ${{ !cancelled() }}
+        run: verilator --lint-only -Wall --top-module mac_lane $RTL_LIBS rtl/fecim_pkg.sv rtl/array/mac_lane.sv
+
 
 # model - build and run model tests
   model:

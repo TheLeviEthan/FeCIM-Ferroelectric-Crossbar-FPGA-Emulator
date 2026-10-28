@@ -1,6 +1,7 @@
 #include "fecim/model_exact.h"
 
 #include <stdexcept>
+#include <string>
 
 #include "fecim/write_path.h"
 
@@ -96,5 +97,30 @@ std::vector<std::int32_t> ModelExact::compute() {
     }
     return y;
 }
+
+// ---- interface stubs (week 2) ---------------------------------------------
+// Signatures are the co-sim / sim-backend contract; bodies land in week 3.
+// Each throws rather than returning an idle-looking default, so a harness
+// written against the stub cannot report a vacuous pass.
+
+namespace {
+[[noreturn]] void not_yet(const char* fn) {
+    throw std::logic_error(std::string("model_exact: ") + fn +
+                           " not implemented yet (week 3)");
+}
+} // namespace
+
+void ModelExact::start_compute()                     { not_yet("start_compute"); }
+void ModelExact::step()                              { not_yet("step"); }
+CtrlState ModelExact::state() const                  { not_yet("state"); }
+bool ModelExact::busy() const                        { not_yet("busy"); }
+int ModelExact::seq_cnt() const                      { not_yet("seq_cnt"); }
+ModelExact::LaneProbe ModelExact::lane(int) const    { not_yet("lane"); }
+std::uint32_t ModelExact::cycle_count() const        { not_yet("cycle_count"); }
+std::vector<std::int32_t> ModelExact::results() const { not_yet("results"); }
+ModelExact::Argmax ModelExact::argmax() const        { not_yet("argmax"); }
+Status ModelExact::set_reg(std::uint8_t, std::uint32_t)        { not_yet("set_reg"); }
+Status ModelExact::get_reg(std::uint8_t, std::uint32_t&) const { not_yet("get_reg"); }
+void ModelExact::reseed()                            { not_yet("reseed"); }
 
 } // namespace fecim
