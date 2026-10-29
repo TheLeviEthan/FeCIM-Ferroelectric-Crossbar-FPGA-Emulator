@@ -56,7 +56,10 @@ def decode_response_frame(frame: bytes) -> Tuple[int, bytes]:
     status = frame[1]
     payload_len = struct.unpack("<H", frame[2:4])[0]
     
-    expected_total_len = 1 (sync) + 1 (status) + 2 (len) + payload_len + 1 (crc)
+    # Fixed calculation without inline function-call syntax:
+    # 1 (sync) + 1 (status) + 2 (len) + payload_len + 1 (crc)
+    expected_total_len = 1 + 1 + 2 + payload_len + 1
+    
     if len(frame) != expected_total_len:
         raise ValueError(f"Frame length mismatch: got {len(frame)} bytes, expected {expected_total_len}")
     
