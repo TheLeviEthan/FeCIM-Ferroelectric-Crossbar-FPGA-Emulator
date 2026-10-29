@@ -54,4 +54,21 @@ std::int8_t quantize_weight(std::int8_t   w_ideal,
     return static_cast<std::int8_t>(w_q);
 }
 
+// ---- week-3 stubs ---------------------------------------------------------
+// Signatures are final; bodies land with the hash/LFSR work in week 3.
+// Throwing (rather than returning the input unchanged) means nothing can
+// pass an L1/L2 comparison by accident before they exist.
+
+std::uint16_t cell_addr(int, int) {
+    throw std::logic_error("cell_addr: not implemented yet (week 3)");
+}
+
+std::int8_t d2d_offset(std::int8_t, std::uint16_t, std::uint32_t, std::uint8_t) {
+    throw std::logic_error("d2d_offset: not implemented yet (week 3)");
+}
+
+std::int8_t apply_stuck(std::int8_t, std::uint16_t, std::uint32_t, std::uint32_t) {
+    throw std::logic_error("apply_stuck: not implemented yet (week 3)");
+}
+
 } // namespace fecim

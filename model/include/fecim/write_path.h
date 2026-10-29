@@ -9,9 +9,10 @@
 //
 //     w_ideal --> 1. quantize --> 2. d2d offset --> 3. stuck-at --> w_stored
 //
-// Stage 1 (quantization) is implemented and tested. Stages 2 and 3 will get
-// their own functions in this header later (d2d_offset(), apply_stuck()). Each stage is its own
-// free function so it can be unit-tested alone; ModelExact::write_weight()
+// Stage 1 (quantization) is implemented and tested. Stages 2 and 3
+// (d2d_offset(), apply_stuck()) are declared with their final signatures
+// but are STUBS until week 3: they throw std::logic_error. Each stage is its
+// own free function so it can be unit-tested alone; ModelExact::write_weight()
 // is the only place that chains them.
 //
 // Ground rules (model-verification-design §2) for everything in this file:
@@ -106,5 +107,55 @@ std::uint16_t quant_mult_for(int n_levels);
 std::int8_t quantize_weight(std::int8_t   w_ideal,
                             std::uint8_t  quant_levels,
                             std::uint16_t quant_mult);
+
+// ---------------------------------------------------------------------------
+// cell_addr -- the GLOBAL cell address both hashes are keyed on
+// (write-path-spec §5): col * TILE_ROWS + row, the same index the bulk
+// weight stream uses. Not the lane-local {pass, row} address: two cells in
+// different lanes must not collide. 128 x 128 = 16384 cells fits 16 bits.
+//
+// STUB (week 3).
+std::uint16_t cell_addr(int row, int col);
+
+// ---------------------------------------------------------------------------
+// d2d_offset(w_q, cell_addr, noise_seed, d2d_sigma)  -- stage 2, datapath
+//
+// Device-to-device programming variation (write-path-spec §5.1-5.2):
+//
+//   h      = cell_hash16(cell_addr, noise_seed[15:0] ^ SEED_D2D)
+//   ih9    = h[7:0] + h[15:8] - 255                 triangular, +/-255
+//   scaled = (ih9 * {0, d2d_sigma}) >>> 8           D2D_SIGMA / 256, NOT Q1.8
+//   w_var  = sat_int8(w_q + scaled)                 SATURATES to +127 / -128
+//
+// Must saturate, never wrap: a wrapping add turns +127 plus a positive
+// offset into -128, a sign inversion. noise_seed is the whole 32-bit
+// register; only [15:0] is used, and the function takes the register as-is
+// so that narrowing is visible here rather than at every call site.
+//
+// STUB (week 3): throws std::logic_error.
+std::int8_t d2d_offset(std::int8_t   w_q,
+                       std::uint16_t cell_addr,
+                       std::uint32_t noise_seed,
+                       std::uint8_t  d2d_sigma);
+
+// ---------------------------------------------------------------------------
+// apply_stuck(w_var, cell_addr, noise_seed, stuck_rate)  -- stage 3, datapath
+//
+// Stuck-at faults (write-path-spec §5.3). Overrides stages 1 and 2:
+//
+//   h_stuck = cell_hash16(cell_addr, noise_seed[15:0] ^ SEED_STUCK)
+//   hit     = h_stuck < stuck_rate[15:0]               rate / 65536
+//   mode 0  (stuck_rate[16] = 0): w = 0                 stuck-at-zero
+//   mode 1  (stuck_rate[16] = 1): w = +/-127            sign from h_d2d[15]
+//
+// The rail sign comes from the D2D hash, not h_stuck (every h_stuck bit is
+// consumed by the threshold compare), so it is drawn even when NOISE_EN.d2d
+// is clear. stuck_rate is the 17-bit register value, passed as uint32_t.
+//
+// STUB (week 3): throws std::logic_error.
+std::int8_t apply_stuck(std::int8_t   w_var,
+                        std::uint16_t cell_addr,
+                        std::uint32_t noise_seed,
+                        std::uint32_t stuck_rate);
 
 } // namespace fecim
