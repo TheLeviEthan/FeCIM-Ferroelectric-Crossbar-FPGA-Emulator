@@ -1,49 +1,147 @@
+## Continuous Integration (CI) workflow for FeCIM project
+## This workflow will run linting, model tests, co-simulation, and Python tests on push and pull request events.
+## Ensures that the code meets quality standards and passes all tests before merging
+
 name: CI
 
-on:
-  push:
+on:        # push fires on every branch; pull_request fires on PR open/update
+  push:    # NOTE: PR commits trigger both, so most commits run the suite twice
   pull_request:
 
+
+# each job will run in parallel on its own VM:
+
 jobs:
+# runs-on is pinned to ubuntu-24.04, not ubuntu-latest: -latest moves to
+# Ubuntu 26.04 (from 19 Oct 2026), whose apt Verilator is newer than the
+# 5.020 everything was verified against. Newer Verilator adds -Wall checks,
+# so lint could go red with no RTL change. Upgrade deliberately, not by drift.
+# linting - statically check code for syntax, style, and potential errors
+# prevents merging code that fails static analysis
+# "second line of defense" after local development checks
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - name: Install Verilator
+      - uses: actions/checkout@v5
+      - name: Install Verilator   # required for linting system verilog
         run: sudo apt-get update && sudo apt-get install -y verilator
-      - name: Lint RTL
+      - name: Lint RTL    # name of the test to be run
+
+        # run Verilator and check for:
+          # WIDTHTRUNC (ensure no unintended width truncation occurs, IMPORTANT) (default on)
+          # UNDRIVEN and UNUSEDSIGNAL will ensure Zhiting, Megan's signals match (-Wall enables)
+          # SYNCASYNCNET ensures net not used as both async reset and synchronous signal (-Wall enables)
+          # LATCH and CASEINCOMPLETE lock in FSM template in conventions document  (default on)
+          # UNOPTFLAT checks for combinatorial logic loops (easier to see than quartus) (default on)
+        # --lint-only enables linting mode in Verilator, without generating a simulation executable
+        # fecim_pkg.sv must come first: SystemVerilog requires a package to be
+          # declared before any module imports it. The find excludes it so it
+          # isn't passed twice.
         run: |
           verilator --lint-only -Wall --top-module fecim_top \
             rtl/fecim_pkg.sv $(find rtl -name '*.sv' -not -name 'fecim_pkg.sv')
 
+      # Standalone lint of the week-2 leaf modules, one step per module so a
+        # failure names the module (and so the owning lane) in the Actions UI.
+        # The full-design lint above only checks each module as fecim_top
+        # happens to wire it; these check it against its own port list.
+        # `if: !cancelled()` runs every step even when an earlier one fails,
+        # so one broken module does not hide the status of the others.
+        # -y adds each rtl/ subdirectory to the library path, so Verilator
+        # finds submodules by file name (mac_lane pulls in read_noise.sv)
+        # without parsing the rest of the design.
+      - name: Collect RTL library directories
+        run: echo "RTL_LIBS=$(find rtl -mindepth 1 -type d -printf '-y %p ')" >> "$GITHUB_ENV"
+      # Lane A (Zhiting): UART
+      - name: Lint baud_gen (standalone)
+        if: ${{ !cancelled() }}
+        run: verilator --lint-only -Wall --top-module baud_gen $RTL_LIBS rtl/fecim_pkg.sv rtl/uart/baud_gen.sv
+      - name: Lint uart_rx (standalone)
+        if: ${{ !cancelled() }}
+        run: verilator --lint-only -Wall --top-module uart_rx $RTL_LIBS rtl/fecim_pkg.sv rtl/uart/uart_rx.sv
+      - name: Lint uart_tx (standalone)
+        if: ${{ !cancelled() }}
+        run: verilator --lint-only -Wall --top-module uart_tx $RTL_LIBS rtl/fecim_pkg.sv rtl/uart/uart_tx.sv
+      # Lane B (Megan): MAC lane. NOTE: while mac_lane.sv still carries its
+        # skeleton lint_off waivers, UNUSEDSIGNAL/UNUSEDPARAM are suppressed
+        # here too; this step only gains its full teeth once they are deleted.
+      - name: Lint mac_lane (standalone)
+        if: ${{ !cancelled() }}
+        run: verilator --lint-only -Wall --top-module mac_lane $RTL_LIBS rtl/fecim_pkg.sv rtl/array/mac_lane.sv
+
+
+# model - build and run model tests
   model:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Configure and build model
+        # read model/CMakeLists.txt to configure build
+        # place generated files in the build directory
         run: cmake -S model -B build && cmake --build build
       - name: Run model tests
         run: ./build/model_tests
+      # golden vectors are committed files; fail if someone edited the
+      # generator (or fecim_pkg.sv geometry) without regenerating them
+      - name: Check mac_lane golden vectors are current
+        run: python3 tb/golden/mac_lane/gen_mac_lane_vectors.py --check
 
+# cycle by cycle EQUIVALENCE CHECK on entire datapath with stochasticity turned off
+# both the Verilated RTL and C++ model live in one process as C++ objects
+# runs the co-simulation harness to perform the equivalence check
   cosim:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      # GATE: skip (green, with a notice) until the week-4 harness lands.
+        # A job-level `if:` cannot see repo files (it runs before checkout),
+        # so a step checks and the rest key off its output.
+        # REMOVE THIS GATE once the harness is merged: after that, a missing
+        # Makefile is a real failure, and a skip would hide the L0 gate.
+      - name: Check co-simulation harness exists
+        id: gate
+        run: |
+          if [ -f model/cosim/Makefile ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::cosim skipped: model/cosim/Makefile not on this branch yet (week-4 harness)"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Install Verilator
+        if: steps.gate.outputs.ready == 'true'
         run: sudo apt-get update && sudo apt-get install -y verilator
       - name: Build co-simulation harness
+        if: steps.gate.outputs.ready == 'true'
         run: make -C model/cosim
       - name: Run L0 bit-exact gate
+        if: steps.gate.outputs.ready == 'true'
         run: ./model/cosim/run_l0
 
+# Python tests for the software package
+# check Python code for syntax, style, and potential errors
+# run all Python tests in sw test directory
   python:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      # GATE: skip (green, with a notice) until Lane D's package is merged.
+        # REMOVE THIS GATE once sw/pyproject.toml is on main.
+      - name: Check Python package exists
+        id: gate
+        run: |
+          if [ -f sw/pyproject.toml ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::python skipped: sw/pyproject.toml not on this branch yet (Lane D package)"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-python@v6
+        if: steps.gate.outputs.ready == 'true'
         with:
           python-version: '3.11'
       - name: Install package and test dependencies
+        if: steps.gate.outputs.ready == 'true'
         run: pip install -e './sw[test]'
       - name: Run Python tests
+        if: steps.gate.outputs.ready == 'true'
         run: pytest sw/tests
