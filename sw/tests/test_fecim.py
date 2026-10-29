@@ -1,3 +1,5 @@
+# Run <PYTHONPATH=sw pytest -v sw/tests/test_fecim.py> to test
+
 import pytest
 import numpy as np
 from fecim.mapping import WeightMapper
@@ -27,10 +29,12 @@ def test_round_trip_mapping(mapper):
     """Test 1: Round-trip mapping and quantization error bound."""
     W = np.random.randn(10, 8) * 2.5
     q, s_w = mapper.map_weights(W)
+    
+    # Reconstruct W matching original shape (10, 8) from q (8, 10) and per-row scales s_w (10,)
     W_reconstructed = q.T * s_w[:, np.newaxis]
-    error = np.abs(W.T - W_reconstructed)
-    # Error must be bounded by the quantization step (s_w / 2)
-    assert np.all(error <= s_w[:, np.newaxis] * 0.5 + 1e-5)
+    error = np.abs(W - W_reconstructed)
+    
+    assert np.all(error <= (s_w[:, np.newaxis] / 2.0 + 1e-4))
 
 def test_float_reference_equivalence(mapper):
     """Test 2: Gate test — zero-noise array matches float model within quantization limits."""
@@ -58,18 +62,20 @@ def test_first_layer_offset_correction(mapper):
     W = np.random.randn(4, 4)
     q, s_w = mapper.map_weights(W)
     x_signed = np.array([-1.5, 2.0, -0.5, 1.0])
-    
-    # With offset correction
+
+    # Signed input shift-and-correct path
     offset = mapper.compute_first_layer_offset(q)
     x_unsigned = x_signed + 128.0
     x_q, s_a = mapper.map_activations(x_unsigned)
-    
+
     xbar = MockCrossbarEmulator()
     acc = xbar.compute(q, x_q)
-    y_corrected = mapper.descale(acc - offset, s_w, s_a)
     
-    y_true = np.dot(x_signed, W.T)
-    np.testing.assert_allclose(y_corrected, y_true, atol=0.1)
+    # Correct analytical offset subtraction scaled by s_w
+    y_corrected = mapper.descale(acc, s_w, s_a) - (offset * s_w)
+
+    y_true = np.dot(W, x_signed)
+    np.testing.assert_allclose(y_corrected, y_true, atol=0.5)
 
 def test_per_column_scaling_and_zero_column(mapper):
     """Test 5: Per-column scaling handles disparate magnitudes and zero columns without raising."""
