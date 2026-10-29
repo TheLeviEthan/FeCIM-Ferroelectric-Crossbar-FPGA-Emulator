@@ -1,0 +1,248 @@
+m255
+K4
+z2
+!s12c _opt2
+Z0 !s99 nomlopt
+!s12c _opt1
+R0
+!s12c _opt
+R0
+!s11f MIXED_VERSIONS
+13
+!s112 1.1
+!i10d 8192
+!i10e 25
+!i10f 100
+cModel Technology
+Z1 dC:/Users/zhiti/OneDrive/FeCIM-Ferroelectric-Crossbar-FPGA-Emulator
+T_opt
+!i145 1
+!i144 0
+!s110 1792612590
+V]8@JM=zAI877PH85^hOe<2
+04 17 4 work tb_ab_integration fast 0
+=1-089df4a63038-6ad918ec-165-3c98
+R0
+Z2 !s12f OEM100
+Z3 !s12b OEM100
+Z4 !s124 OEM10U2 
+Z5 !s135 nogc
+Z6 o-quiet -auto_acc_if_foreign -work work
+Z7 tCvgOpt 0 defaultOptions 1107585188
+n@_opt
+Z8 OL;O;2025.2;82
+R1
+T_opt1
+!i145 1
+!i144 0
+!s110 1793220975
+Vi8Wcd:YiPh9o?7z`D4XmN2
+04 16 4 work tb_packet_parser fast 0
+=1-089df4a63038-6ae2616e-22-9f8
+R0
+R2
+R3
+R4
+R5
+R6
+R7
+n@_opt1
+R8
+R1
+T_opt2
+!i145 1
+!i144 0
+!s110 1793224660
+VcWW]?D:]9FHQ]6G5lND@G1
+04 12 4 work tb_packet_tx fast 0
+=1-089df4a63038-6ae26fd3-5e-4808
+R0
+R2
+R3
+R4
+R5
+R6
+R7
+n@_opt2
+R8
+Xfecim_pkg
+Z9 2rtl/fecim_pkg.sv|rtl/packet/packet_tx.sv|tb/tb_packet_tx.sv
+Z10 DXx6 sv_std 3 std 0 22 @5XbY]_OacJl=`ToSm<M^0
+Z11 !s110 1793224656
+!i10b 1
+!s100 0HA7JGznldAXom0l4=?l]3
+IU2`g4RzCRNLc=;[foj@J>1
+S1
+R1
+w1791223225
+8rtl/fecim_pkg.sv
+Frtl/fecim_pkg.sv
+!i122 8
+L0 37 0
+VU2`g4RzCRNLc=;[foj@J>1
+Z12 OL;L;2025.2;82
+r1
+!s85 0
+31
+Z13 !s108 1793224656.000000
+Z14 !s107 tb/tb_packet_tx.sv|rtl/packet/packet_tx.sv|rtl/fecim_pkg.sv|
+Z15 !s90 -reportprogress|300|-sv|rtl/fecim_pkg.sv|rtl/packet/packet_tx.sv|tb/tb_packet_tx.sv|
+!i113 0
+Z16 o-sv -L mtiAvm -L mtiRnm -L mtiOvm -L mtiUvm -L mtiUPF -L infact
+Z17 tCvgOpt 0 defaultOptions 1085333592
+vlane_a_stub
+Z18 2rtl/fecim_pkg.sv|tb/integration/lane_a_stub.sv|tb/integration/tb_ab_integration.sv
+R10
+Z19 DXx4 work 9 fecim_pkg 0 22 U2`g4RzCRNLc=;[foj@J>1
+Z20 !s110 1792612581
+!i10b 1
+!s100 H4NEN:Z<?K@A6CFGL2k:G2
+Ia0jodjCAWc4Xca;ahA[Rn3
+S1
+R1
+w1792612228
+8tb/integration/lane_a_stub.sv
+Ftb/integration/lane_a_stub.sv
+!i122 4
+L0 3 114
+Z21 VDg1SIo80bB@j0V0VzS_@n1
+R12
+r1
+!s85 0
+31
+Z22 !s108 1792612581.000000
+Z23 !s107 tb/integration/tb_ab_integration.sv|tb/integration/lane_a_stub.sv|rtl/fecim_pkg.sv|
+Z24 !s90 -reportprogress|300|-sv|rtl/fecim_pkg.sv|tb/integration/lane_a_stub.sv|tb/integration/tb_ab_integration.sv|
+!i113 0
+R16
+R17
+vpacket_parser
+Z25 2rtl/fecim_pkg.sv|rtl/packet/packet_parser.sv|tb/tb_packet_parser.sv
+R10
+R19
+Z26 !s110 1793220973
+!i10b 1
+!s100 P_TH568GRH3n`g:dSLETP2
+I5NIll;c3F19BXF@4`f1UQ0
+S1
+R1
+w1793220467
+8rtl/packet/packet_parser.sv
+Frtl/packet/packet_parser.sv
+!i122 6
+L0 3 247
+R21
+R12
+r1
+!s85 0
+31
+Z27 !s108 1793220973.000000
+Z28 !s107 tb/tb_packet_parser.sv|rtl/packet/packet_parser.sv|rtl/fecim_pkg.sv|
+Z29 !s90 -reportprogress|300|-sv|rtl/fecim_pkg.sv|rtl/packet/packet_parser.sv|tb/tb_packet_parser.sv|
+!i113 0
+R16
+R17
+vpacket_tx
+R9
+R10
+R19
+R11
+!i10b 1
+!s100 4of<=gfGXikAIn7[IVoN33
+IAHFiiMc;WzGzYa72Bem`m2
+S1
+R1
+w1793224385
+8rtl/packet/packet_tx.sv
+Frtl/packet/packet_tx.sv
+!i122 8
+L0 4 116
+R21
+R12
+r1
+!s85 0
+31
+R13
+R14
+R15
+!i113 0
+R16
+R17
+vtb_ab_integration
+R18
+R10
+R19
+R20
+!i10b 1
+!s100 HJmkFMh5<<f?8OFKnHm?^3
+Ie?m_O>E6nY1YzIc3zzfnQ2
+S1
+R1
+w1792612224
+8tb/integration/tb_ab_integration.sv
+Ftb/integration/tb_ab_integration.sv
+!i122 4
+L0 2 113
+R21
+R12
+r1
+!s85 0
+31
+R22
+R23
+R24
+!i113 0
+R16
+R17
+vtb_packet_parser
+R25
+R10
+R19
+R26
+!i10b 1
+!s100 VPk[b1UFO4Cj;SQFgU8Nd2
+I<z];SV4MQ0V`fU050bPbc1
+S1
+R1
+w1793220962
+8tb/tb_packet_parser.sv
+Ftb/tb_packet_parser.sv
+!i122 6
+L0 3 170
+R21
+R12
+r1
+!s85 0
+31
+R27
+R28
+R29
+!i113 0
+R16
+R17
+vtb_packet_tx
+R9
+R10
+R19
+R11
+!i10b 1
+!s100 mfVSZY;<5cO7_X5O2^iI20
+IGEGOjo[fYmfURJeDLhXG]0
+S1
+R1
+w1793224648
+8tb/tb_packet_tx.sv
+Ftb/tb_packet_tx.sv
+!i122 8
+L0 2 151
+R21
+R12
+r1
+!s85 0
+31
+R13
+R14
+R15
+!i113 0
+R16
+R17

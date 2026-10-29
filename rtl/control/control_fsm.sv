@@ -1,5 +1,5 @@
 //=============================================================================
-// control_fsm.sv -- Lane A
+//control_fsm.sv -- Lane A
 //
 // MVM sequencer: IDLE -> CLEAR -> ACC -> DRAIN -> DONE, one counter drives the array.
 // Spec: control-fsm-spec.md §3-4, rtl-conventions §5
