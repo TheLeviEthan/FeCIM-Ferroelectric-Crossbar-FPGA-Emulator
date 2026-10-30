@@ -1,0 +1,6 @@
+# To switch to real hardware in Week 3, change 'backend' to 'fpga' or 'serial'
+backend: "loopback"
+port: "/dev/ttyUSB0"      # Dynamic port assignment
+baudrate: 921600          # Dynamic high-speed baud rate (178 ms per 128x128 load)
+parameter_set: "gf28_hkmg"
+timeout: 2.0
