@@ -39,3 +39,10 @@ sw/fecim/datasets/
 .DS_Store
 # Verilator co-sim binary (model/cosim/Makefile)
 model/cosim/run_l0
+
+# ModelSim / Questa (vlib work, vsim logs) -- never commit compiled libraries
+work/
+transcript
+*.wlf
+modelsim.ini
+vsim.dbg

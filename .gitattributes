@@ -1,0 +1,18 @@
+# Normalize line endings: LF in the repository, whatever the checkout OS.
+# Without this, a Windows checkout (autocrlf) seen from WSL git shows every
+# CRLF file as modified, and CRLF edits turn into whole-file diffs/conflicts.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# Binary: never touch
+*.pdf  binary
+*.png  binary
+*.jpg  binary
+*.sof  binary
+*.pof  binary
+*.qdb  binary
+*.bin  binary
