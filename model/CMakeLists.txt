@@ -58,5 +58,16 @@ set_target_properties(model_tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}
     RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR})
 
+# ---- pre-alpha demo -------------------------------------------------------
+# ./build/fecim_demo [seed]: clean path bit-exact vs model_ideal, then the
+# error conductance quantization introduces at N levels.
+add_executable(fecim_demo examples/demo_mvm.cpp)
+target_link_libraries(fecim_demo PRIVATE fecim_model)
+target_compile_options(fecim_demo PRIVATE ${FECIM_WARNINGS})
+set_target_properties(fecim_demo PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+    RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}
+    RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR})
+
 enable_testing()
 add_test(NAME model_tests COMMAND model_tests)
