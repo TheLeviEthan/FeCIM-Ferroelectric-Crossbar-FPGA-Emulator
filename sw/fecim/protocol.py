@@ -34,12 +34,11 @@ def crc8(data: bytes) -> int:
     Excludes the sync byte per protocol.md §3.1.
     """
     crc = 0x00
-    for b in data:
-        crc ^= b
+    for byte in data:
+        crc ^= byte
         for _ in range(8):
             crc = ((crc << 1) ^ 0x07) & 0xFF if (crc & 0x80) else ((crc << 1) & 0xFF)
     return crc
-
 
 def build_packet(cmd: int, payload: bytes = b"") -> bytes:
     """
@@ -59,6 +58,16 @@ def build_packet(cmd: int, payload: bytes = b"") -> bytes:
     
     return sync + cmd_byte + length_bytes + payload + crc_byte
 
+def verify_crc(packet: bytes) -> bool:
+    """Verifies CRC-8/ATM over CMD/STATUS, LEN, and PAYLOAD, excluding the sync byte."""
+    if len(packet) < 2:
+        return False
+    
+    # Exclude the sync byte at index 0 and the trailing CRC byte[cite: 7]
+    data_to_check = packet[1:-1]
+    received_crc = packet[-1]
+    
+    return crc8(data_to_check) == received_crc
 
 class PacketParser:
     """
