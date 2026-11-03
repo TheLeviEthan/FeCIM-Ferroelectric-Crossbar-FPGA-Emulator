@@ -1,12 +1,20 @@
 m255
 K4
 z2
+Z0 !s12c _opt1
+Z1 !s99 nomlopt
+R0
+R1
+R0
+R1
+Z2 !s12c _opt
+R1
 !s12c _opt2
-Z0 !s99 nomlopt
-!s12c _opt1
+R1
 R0
-!s12c _opt
-R0
+R1
+R2
+R1
 !s11f MIXED_VERSIONS
 13
 !s112 1.1
@@ -14,41 +22,41 @@ R0
 !i10e 25
 !i10f 100
 cModel Technology
-Z1 dC:/Users/zhiti/OneDrive/FeCIM-Ferroelectric-Crossbar-FPGA-Emulator
+Z3 dC:/Users/zhiti/OneDrive/FeCIM-Ferroelectric-Crossbar-FPGA-Emulator
 T_opt
 !i145 1
 !i144 0
-!s110 1792612590
-V]8@JM=zAI877PH85^hOe<2
-04 17 4 work tb_ab_integration fast 0
-=1-089df4a63038-6ad918ec-165-3c98
-R0
-Z2 !s12f OEM100
-Z3 !s12b OEM100
-Z4 !s124 OEM10U2 
-Z5 !s135 nogc
-Z6 o-quiet -auto_acc_if_foreign -work work
-Z7 tCvgOpt 0 defaultOptions 1107585188
-n@_opt
-Z8 OL;O;2025.2;82
+!s110 1793292038
+VMT6R1J^0oQLoMm@5VoJl]1
+04 9 4 work fecim_top fast 0
+=1-089df4a63038-6ae37703-9a-2574
 R1
+Z4 !s12f OEM100
+Z5 !s12b OEM100
+!s124 OEM10U146 
+Z6 !s135 nogc
+Z7 o-quiet -auto_acc_if_foreign -work work
+Z8 tCvgOpt 0 defaultOptions 1107585188
+n@_opt
+Z9 OL;O;2025.2;82
+R3
 T_opt1
 !i145 1
 !i144 0
-!s110 1793220975
-Vi8Wcd:YiPh9o?7z`D4XmN2
-04 16 4 work tb_packet_parser fast 0
-=1-089df4a63038-6ae2616e-22-9f8
-R0
-R2
-R3
+!s110 1793564053
+V];fVFIEkc1FeFf6:a=GJe1
+04 17 4 work tb_ab_integration fast 0
+=1-089df4a63038-6ae79d95-125-7d20
+R1
 R4
 R5
+!s124 OEM10U3 
 R6
 R7
-n@_opt1
 R8
-R1
+n@_opt1
+R9
+R3
 T_opt2
 !i145 1
 !i144 0
@@ -56,193 +64,684 @@ T_opt2
 VcWW]?D:]9FHQ]6G5lND@G1
 04 12 4 work tb_packet_tx fast 0
 =1-089df4a63038-6ae26fd3-5e-4808
-R0
-R2
-R3
+R1
 R4
 R5
+!s124 OEM10U2 
 R6
 R7
-n@_opt2
 R8
+n@_opt2
+R9
+R3
+vact_buffer
+Z10 2rtl/write/write_path.sv|rtl/array/act_buffer.sv|rtl/array/adc_quant.sv|rtl/array/mac_array.sv|rtl/array/mac_lane.sv|rtl/array/read_noise.sv|rtl/result/argmax_unit.sv|rtl/result/result_buffer.sv
+Z11 DXx6 sv_std 3 std 0 22 @5XbY]_OacJl=`ToSm<M^0
+Z12 DXx4 work 9 fecim_pkg 0 22 U2`g4RzCRNLc=;[foj@J>1
+Z13 !s110 1793292019
+!i10b 1
+!s100 H_8bo[h;McRhfMfiQ81bO1
+InNENc5aHcTNcn_mAiDK711
+S1
+R3
+Z14 w1791223225
+8rtl/array/act_buffer.sv
+Frtl/array/act_buffer.sv
+!i122 11
+L0 19 20
+Z15 VDg1SIo80bB@j0V0VzS_@n1
+Z16 OL;L;2025.2;82
+r1
+!s85 0
+31
+Z17 !s108 1793292018.000000
+Z18 !s107 rtl/result/result_buffer.sv|rtl/result/argmax_unit.sv|rtl/array/read_noise.sv|rtl/array/mac_lane.sv|rtl/array/mac_array.sv|rtl/array/adc_quant.sv|rtl/array/act_buffer.sv|rtl/write/write_path.sv|
+Z19 !s90 -reportprogress|300|-sv|rtl/write/write_path.sv|rtl/array/act_buffer.sv|rtl/array/adc_quant.sv|rtl/array/mac_array.sv|rtl/array/mac_lane.sv|rtl/array/read_noise.sv|rtl/result/argmax_unit.sv|rtl/result/result_buffer.sv|
+!i113 0
+Z20 o-sv -L mtiAvm -L mtiRnm -L mtiOvm -L mtiUvm -L mtiUPF -L infact
+Z21 tCvgOpt 0 defaultOptions 1085333592
+vadc_quant
+R10
+R11
+R12
+R13
+!i10b 1
+!s100 zVUZe9dzm?n=ZlLViWG5=3
+I7fTQeZR@3017UF1:<a14C2
+S1
+R3
+R14
+8rtl/array/adc_quant.sv
+Frtl/array/adc_quant.sv
+!i122 11
+L0 19 13
+R15
+R16
+r1
+!s85 0
+31
+R17
+R18
+R19
+!i113 0
+R20
+R21
+vargmax_unit
+R10
+R11
+R12
+R13
+!i10b 1
+!s100 _jGaXFF8>`C5^9dU:@:M?3
+IJbTPE40QnhK2Kc8QR_I7E0
+S1
+R3
+R14
+8rtl/result/argmax_unit.sv
+Frtl/result/argmax_unit.sv
+!i122 11
+L0 19 19
+R15
+R16
+r1
+!s85 0
+31
+R17
+R18
+R19
+!i113 0
+R20
+R21
+vbaud_gen
+Z22 2rtl/uart/baud_gen.sv|rtl/uart/uart_rx.sv|rtl/uart/uart_tx.sv|rtl/packet/packet_parser.sv|rtl/packet/packet_tx.sv|rtl/control/config_regs.sv|rtl/control/control_fsm.sv|rtl/control/display_driver.sv|rtl/control/readout_ser.sv|rtl/control/reset_sync.sv
+R11
+Z23 !s110 1793292014
+!i10b 1
+!s100 WU4Y5eNN=CG@R?GS39PTJ3
+ISoaG5QWz1I5S[5KWi6NT?0
+S1
+R3
+w1792609450
+8rtl/uart/baud_gen.sv
+Frtl/uart/baud_gen.sv
+!i122 10
+L0 20 28
+R15
+R16
+r1
+!s85 0
+31
+Z24 !s108 1793292014.000000
+Z25 !s107 rtl/control/reset_sync.sv|rtl/control/readout_ser.sv|rtl/control/display_driver.sv|rtl/control/control_fsm.sv|rtl/control/config_regs.sv|rtl/packet/packet_tx.sv|rtl/packet/packet_parser.sv|rtl/uart/uart_tx.sv|rtl/uart/uart_rx.sv|rtl/uart/baud_gen.sv|
+Z26 !s90 -reportprogress|300|-sv|rtl/uart/baud_gen.sv|rtl/uart/uart_rx.sv|rtl/uart/uart_tx.sv|rtl/packet/packet_parser.sv|rtl/packet/packet_tx.sv|rtl/control/config_regs.sv|rtl/control/control_fsm.sv|rtl/control/display_driver.sv|rtl/control/readout_ser.sv|rtl/control/reset_sync.sv|
+!i113 0
+R20
+R21
+vconfig_regs
+2rtl/control/config_regs.sv
+R11
+R12
+Z27 !s110 1793564615
+!i10b 1
+!s100 db4cUGeg8c4k4agVS0IYZ1
+IhfgJ@EzKa1aiam<;f_6hn3
+S1
+R3
+w1793564601
+8rtl/control/config_regs.sv
+Frtl/control/config_regs.sv
+!i122 29
+L0 4 208
+R15
+R16
+r1
+!s85 0
+31
+!s108 1793564615.000000
+!s107 rtl/control/config_regs.sv|
+!s90 -reportprogress|300|-sv|rtl/control/config_regs.sv|
+!i113 0
+R20
+R21
+vcontrol_fsm
+R22
+R11
+R12
+R23
+!i10b 1
+!s100 Q_iAk;^4WM`[cWRKFJbN93
+IQTGgn2S_X3C[o98X`f35[0
+S1
+R3
+w1793289888
+8rtl/control/control_fsm.sv
+Frtl/control/control_fsm.sv
+!i122 10
+L0 19 46
+R15
+R16
+r1
+!s85 0
+31
+R24
+R25
+R26
+!i113 0
+R20
+R21
+vdisplay_driver
+R22
+R11
+R12
+R23
+!i10b 1
+!s100 WhWEX<lPg8cC`=2Hc6KOI1
+I4en3QXhLXik4J<F_9iCOJ0
+S1
+R3
+R14
+8rtl/control/display_driver.sv
+Frtl/control/display_driver.sv
+!i122 10
+L0 19 29
+R15
+R16
+r1
+!s85 0
+31
+R24
+R25
+R26
+!i113 0
+R20
+R21
 Xfecim_pkg
-Z9 2rtl/fecim_pkg.sv|rtl/packet/packet_tx.sv|tb/tb_packet_tx.sv
-Z10 DXx6 sv_std 3 std 0 22 @5XbY]_OacJl=`ToSm<M^0
-Z11 !s110 1793224656
+2rtl/fecim_pkg.sv
+R11
+R27
 !i10b 1
 !s100 0HA7JGznldAXom0l4=?l]3
 IU2`g4RzCRNLc=;[foj@J>1
 S1
-R1
-w1791223225
+R3
+R14
 8rtl/fecim_pkg.sv
 Frtl/fecim_pkg.sv
-!i122 8
+!i122 28
 L0 37 0
 VU2`g4RzCRNLc=;[foj@J>1
-Z12 OL;L;2025.2;82
+R16
 r1
 !s85 0
 31
-Z13 !s108 1793224656.000000
-Z14 !s107 tb/tb_packet_tx.sv|rtl/packet/packet_tx.sv|rtl/fecim_pkg.sv|
-Z15 !s90 -reportprogress|300|-sv|rtl/fecim_pkg.sv|rtl/packet/packet_tx.sv|tb/tb_packet_tx.sv|
+!s108 1793564614.000000
+!s107 rtl/fecim_pkg.sv|
+!s90 -reportprogress|300|-sv|rtl/fecim_pkg.sv|
 !i113 0
-Z16 o-sv -L mtiAvm -L mtiRnm -L mtiOvm -L mtiUvm -L mtiUPF -L infact
-Z17 tCvgOpt 0 defaultOptions 1085333592
+R20
+R21
+vfecim_pkg_checks
+2rtl/fecim_pkg.sv|rtl/fecim_pkg_checks.sv
+R11
+R12
+!s110 1793292009
+!i10b 1
+!s100 `mD6bcac=9OG882THB[e<1
+IKQ3o2CaiGH9O25GY>4VNS0
+S1
+R3
+R14
+8rtl/fecim_pkg_checks.sv
+Frtl/fecim_pkg_checks.sv
+!i122 9
+L0 13 34
+R15
+R16
+r1
+!s85 0
+31
+!s108 1793292008.000000
+!s107 rtl/fecim_pkg_checks.sv|rtl/fecim_pkg.sv|
+!s90 -reportprogress|300|-sv|rtl/fecim_pkg.sv|rtl/fecim_pkg_checks.sv|
+!i113 0
+R20
+R21
+vfecim_top
+2rtl/fecim_top.sv
+R11
+R12
+!s110 1793292032
+!i10b 1
+!s100 JZ_N=k5SR`ePkU@S@Oe0P3
+I4=@=R^^Y^4>gg0bkdDdQY0
+S1
+R3
+R14
+8rtl/fecim_top.sv
+Frtl/fecim_top.sv
+!i122 12
+L0 11 375
+R15
+R16
+r1
+!s85 0
+31
+!s108 1793292032.000000
+!s107 rtl/fecim_top.sv|
+!s90 -reportprogress|300|-sv|rtl/fecim_top.sv|
+!i113 0
+R20
+R21
 vlane_a_stub
-Z18 2rtl/fecim_pkg.sv|tb/integration/lane_a_stub.sv|tb/integration/tb_ab_integration.sv
-R10
-Z19 DXx4 work 9 fecim_pkg 0 22 U2`g4RzCRNLc=;[foj@J>1
-Z20 !s110 1792612581
+2tb/integration/lane_a_stub.sv
+R11
+R12
+Z28 !s110 1793564045
 !i10b 1
 !s100 H4NEN:Z<?K@A6CFGL2k:G2
 Ia0jodjCAWc4Xca;ahA[Rn3
 S1
-R1
+R3
 w1792612228
 8tb/integration/lane_a_stub.sv
 Ftb/integration/lane_a_stub.sv
-!i122 4
+!i122 22
 L0 3 114
-Z21 VDg1SIo80bB@j0V0VzS_@n1
-R12
+R15
+R16
 r1
 !s85 0
 31
-Z22 !s108 1792612581.000000
-Z23 !s107 tb/integration/tb_ab_integration.sv|tb/integration/lane_a_stub.sv|rtl/fecim_pkg.sv|
-Z24 !s90 -reportprogress|300|-sv|rtl/fecim_pkg.sv|tb/integration/lane_a_stub.sv|tb/integration/tb_ab_integration.sv|
+Z29 !s108 1793564045.000000
+!s107 tb/integration/lane_a_stub.sv|
+!s90 -reportprogress|300|-sv|tb/integration/lane_a_stub.sv|
 !i113 0
+R20
+R21
+vlane_b_stub
+2tb/integration/lane_b_stub.sv
+R11
+R12
+R28
+!i10b 1
+!s100 SGSLkV=I=hKUb7=zIJ6H40
+ICJ@]A`i1]ePG<2gHh45?O2
+S1
+R3
+w1793563566
+8tb/integration/lane_b_stub.sv
+Ftb/integration/lane_b_stub.sv
+!i122 23
+L0 6 29
+R15
 R16
-R17
-vpacket_parser
-Z25 2rtl/fecim_pkg.sv|rtl/packet/packet_parser.sv|tb/tb_packet_parser.sv
+r1
+!s85 0
+31
+R29
+!s107 tb/integration/lane_b_stub.sv|
+!s90 -reportprogress|300|-sv|tb/integration/lane_b_stub.sv|
+!i113 0
+R20
+R21
+vmac_array
 R10
+R11
+R12
+R13
+!i10b 1
+!s100 1<ho9mL6nZb_jLz27C^Ni3
+IVNcSEXDD2z80S7zb18MI30
+S1
+R3
+R14
+8rtl/array/mac_array.sv
+Frtl/array/mac_array.sv
+!i122 11
+L0 19 52
+R15
+R16
+r1
+!s85 0
+31
+R17
+R18
 R19
-Z26 !s110 1793220973
+!i113 0
+R20
+R21
+vmac_lane
+R10
+R11
+R12
+R13
+!i10b 1
+!s100 >65<jmDa9^ccXK>1<Jn5Q3
+I46_0J;`[O:QNV`TAECQHh3
+S1
+R3
+R14
+8rtl/array/mac_lane.sv
+Frtl/array/mac_lane.sv
+!i122 11
+L0 19 44
+R15
+R16
+r1
+!s85 0
+31
+R17
+R18
+R19
+!i113 0
+R20
+R21
+vpacket_parser
+R22
+R11
+R12
+R23
 !i10b 1
 !s100 P_TH568GRH3n`g:dSLETP2
 I5NIll;c3F19BXF@4`f1UQ0
 S1
-R1
+R3
 w1793220467
 8rtl/packet/packet_parser.sv
 Frtl/packet/packet_parser.sv
-!i122 6
+!i122 10
 L0 3 247
-R21
-R12
+R15
+R16
 r1
 !s85 0
 31
-Z27 !s108 1793220973.000000
-Z28 !s107 tb/tb_packet_parser.sv|rtl/packet/packet_parser.sv|rtl/fecim_pkg.sv|
-Z29 !s90 -reportprogress|300|-sv|rtl/fecim_pkg.sv|rtl/packet/packet_parser.sv|tb/tb_packet_parser.sv|
+R24
+R25
+R26
 !i113 0
-R16
-R17
+R20
+R21
 vpacket_tx
-R9
-R10
-R19
+2rtl/packet/packet_tx.sv
 R11
+R12
+Z30 !s110 1793564310
 !i10b 1
 !s100 4of<=gfGXikAIn7[IVoN33
 IAHFiiMc;WzGzYa72Bem`m2
 S1
-R1
+R3
 w1793224385
 8rtl/packet/packet_tx.sv
 Frtl/packet/packet_tx.sv
-!i122 8
+!i122 26
 L0 4 116
-R21
-R12
+R15
+R16
 r1
 !s85 0
 31
-R13
-R14
-R15
+Z31 !s108 1793564310.000000
+!s107 rtl/packet/packet_tx.sv|
+!s90 -reportprogress|300|-sv|rtl/packet/packet_tx.sv|
 !i113 0
-R16
-R17
-vtb_ab_integration
-R18
-R10
-R19
 R20
+R21
+vread_noise
+R10
+R11
+R12
+R13
 !i10b 1
-!s100 HJmkFMh5<<f?8OFKnHm?^3
-Ie?m_O>E6nY1YzIc3zzfnQ2
+!s100 :YkE9=XB:UVZGbb]]h?oE1
+I>3jmFl;8CW[nKKMeP[WW?2
 S1
-R1
-w1792612224
+R3
+R14
+8rtl/array/read_noise.sv
+Frtl/array/read_noise.sv
+!i122 11
+L0 19 17
+R15
+R16
+r1
+!s85 0
+31
+R17
+R18
+R19
+!i113 0
+R20
+R21
+vreadout_ser
+R22
+R11
+R12
+R23
+!i10b 1
+!s100 OhUCBkSPzd0Fo3GlJQZCZ1
+I[DXI5gH46EmmlAN67igha3
+S1
+R3
+R14
+8rtl/control/readout_ser.sv
+Frtl/control/readout_ser.sv
+!i122 10
+L0 19 32
+R15
+R16
+r1
+!s85 0
+31
+R24
+R25
+R26
+!i113 0
+R20
+R21
+vreset_sync
+R22
+R11
+R23
+!i10b 1
+!s100 Kh51df8C0de[9e7PAPX[02
+IN^oQX_P[n45ZbQGWLl8h33
+S1
+R3
+R14
+8rtl/control/reset_sync.sv
+Frtl/control/reset_sync.sv
+!i122 10
+L0 9 16
+R15
+R16
+r1
+!s85 0
+31
+R24
+R25
+R26
+!i113 0
+R20
+R21
+vresult_buffer
+R10
+R11
+R12
+R13
+!i10b 1
+!s100 GMADADiM]1i?8Ue5I23U62
+I_liaeT:U<1?bDQ?I8z>6<1
+S1
+R3
+R14
+8rtl/result/result_buffer.sv
+Frtl/result/result_buffer.sv
+!i122 11
+L0 19 25
+R15
+R16
+r1
+!s85 0
+31
+R17
+R18
+R19
+!i113 0
+R20
+R21
+vtb_ab_integration
+2tb/integration/tb_ab_integration.sv
+R11
+R12
+R28
+!i10b 1
+!s100 mD][4EPoo<LPI_fWIbYHQ1
+I^`^I;nff`Dn=;c27>aKl92
+S1
+R3
+w1793563977
 8tb/integration/tb_ab_integration.sv
 Ftb/integration/tb_ab_integration.sv
-!i122 4
-L0 2 113
-R21
-R12
+!i122 24
+L0 21 340
+R15
+R16
 r1
 !s85 0
 31
-R22
-R23
-R24
+R29
+!s107 tb/integration/tb_ab_integration.sv|
+!s90 -reportprogress|300|-sv|tb/integration/tb_ab_integration.sv|
 !i113 0
-R16
-R17
+R20
+R21
 vtb_packet_parser
-R25
-R10
-R19
-R26
+2rtl/fecim_pkg.sv|rtl/packet/packet_parser.sv|tb/tb_packet_parser.sv
+R11
+R12
+!s110 1793220973
 !i10b 1
 !s100 VPk[b1UFO4Cj;SQFgU8Nd2
 I<z];SV4MQ0V`fU050bPbc1
 S1
-R1
+R3
 w1793220962
 8tb/tb_packet_parser.sv
 Ftb/tb_packet_parser.sv
 !i122 6
 L0 3 170
-R21
-R12
+R15
+R16
 r1
 !s85 0
 31
-R27
-R28
-R29
+!s108 1793220973.000000
+!s107 tb/tb_packet_parser.sv|rtl/packet/packet_parser.sv|rtl/fecim_pkg.sv|
+!s90 -reportprogress|300|-sv|rtl/fecim_pkg.sv|rtl/packet/packet_parser.sv|tb/tb_packet_parser.sv|
 !i113 0
-R16
-R17
+R20
+R21
 vtb_packet_tx
-R9
-R10
-R19
+2tb/tb_packet_tx.sv
 R11
+R12
+R30
 !i10b 1
 !s100 mfVSZY;<5cO7_X5O2^iI20
 IGEGOjo[fYmfURJeDLhXG]0
 S1
-R1
+R3
 w1793224648
 8tb/tb_packet_tx.sv
 Ftb/tb_packet_tx.sv
-!i122 8
+!i122 27
 L0 2 151
-R21
-R12
+R15
+R16
 r1
 !s85 0
 31
-R13
-R14
-R15
+R31
+!s107 tb/tb_packet_tx.sv|
+!s90 -reportprogress|300|-sv|tb/tb_packet_tx.sv|
 !i113 0
+R20
+R21
+vuart_rx
+R22
+R11
+R23
+!i10b 1
+!s100 fcT3XboAf1^VdVH6P?1El2
+Id_j=>UCQ=6`FL2_GC^56V0
+S1
+R3
+w1792609596
+8rtl/uart/uart_rx.sv
+Frtl/uart/uart_rx.sv
+!i122 10
+L0 1 53
+R15
 R16
+r1
+!s85 0
+31
+R24
+R25
+R26
+!i113 0
+R20
+R21
+vuart_tx
+R22
+R11
+R23
+!i10b 1
+!s100 CKkhC]Ij8N`8LL8>EGV7c1
+IF@BEl:TTTUJFC4];DXYCZ2
+S1
+R3
+w1792608780
+8rtl/uart/uart_tx.sv
+Frtl/uart/uart_tx.sv
+!i122 10
+L0 1 33
+R15
+R16
+r1
+!s85 0
+31
+R24
+R25
+R26
+!i113 0
+R20
+R21
+vwrite_path
+R10
+R11
+R12
+R13
+!i10b 1
+!s100 DLeN=YT8`3L5:ZB9<b7DE0
+If>J_b^>I4Ob9j3]bXBQ<62
+S1
+R3
+R14
+8rtl/write/write_path.sv
+Frtl/write/write_path.sv
+!i122 11
+L0 19 33
+R15
+R16
+r1
+!s85 0
+31
 R17
+R18
+R19
+!i113 0
+R20
+R21
