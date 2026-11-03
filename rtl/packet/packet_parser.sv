@@ -11,7 +11,9 @@ module packet_parser import fecim_pkg::*; (
     output logic cfg_we,
     output logic [7:0] cfg_addr,
     output logic [31:0] cfg_wdata,
-    input logic [31:0] cfg_rdata,
+     /* verilator lint_off UNUSEDSIGNAL */
+    input logic [31:0] cfg_rdata,   // TODO: GET_CONFIG response not implemented
+    /* verilator lint_on UNUSEDSIGNAL */
     output logic start_compute,
     input logic compute_busy, compute_done,
     output logic rd_go, rd_argmax,
