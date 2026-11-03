@@ -3,6 +3,8 @@ from sklearn.datasets import load_digits
 from sklearn.model_selection import train_test_split
 from fecim.mapping import WeightMapper
 
+# run <PYTHONPATH=sw python3 sw/examples/demo_pipeline.py> to test
+
 class DemoNetworkPipeline:
     def __init__(self, mode="mlp", quant_levels=4):
         """
