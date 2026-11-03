@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 //=============================================================================
 // fecim_pkg.sv
 //
@@ -50,7 +51,7 @@ package fecim_pkg;
     // Array geometry
     //
     // TILE_ROWS and NUM_LANES MUST be powers of two -- the sequencer decodes
-    // addresses with wire slices instead of arithmetic. See control-fsm §3.1.
+    // addresses with wire slices instead of arithmetic. See control-fsm Â§3.1.
     //-------------------------------------------------------------------------
     parameter int TILE_ROWS       = 128;
     parameter int TILE_COLS       = 128;
@@ -195,7 +196,7 @@ package fecim_pkg;
     } uart_rx_state_e;
 
     //-------------------------------------------------------------------------
-    // Config register map -- see control-fsm §6
+    // Config register map -- see control-fsm Â§6
     //-------------------------------------------------------------------------
     typedef enum logic [7:0] {
         REG_CTRL         = 8'h00,

@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module top_level (
     input  wire       MAX10_CLK1_50,
     input  wire [1:0] KEY,

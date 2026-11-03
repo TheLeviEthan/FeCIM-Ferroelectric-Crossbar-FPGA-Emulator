@@ -1,11 +1,12 @@
+`timescale 1ns/1ps
 //=============================================================================
 // act_buffer.sv -- Lane B
 //
 // Activation buffer (M9K) plus shared IR-drop attenuation multiply in the broadcast path.
-// Spec: activation-buffer-spec.md, mac-array-spec.md §8
+// Spec: activation-buffer-spec.md, mac-array-spec.md Â§8
 //
 // SKELETON. Port list is provisional -- confirm against the spec and the
-// frozen A/B seam (top-level-spec §7.1) before implementing. Outputs are
+// frozen A/B seam (top-level-spec Â§7.1) before implementing. Outputs are
 // tied to safe idle values so the top level elaborates and lints cleanly.
 //
 // TODO(lane b): implement, then DELETE the lint waivers below. They

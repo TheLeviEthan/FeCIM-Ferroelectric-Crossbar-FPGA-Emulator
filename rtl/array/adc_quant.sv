@@ -1,11 +1,12 @@
+`timescale 1ns/1ps
 //=============================================================================
 // adc_quant.sv -- Lane B
 //
 // Shared ADC model at the drain-chain output: round-to-nearest over ACC_USED_W.
-// Spec: mac-array-spec.md §9
+// Spec: mac-array-spec.md Â§9
 //
 // SKELETON. Port list is provisional -- confirm against the spec and the
-// frozen A/B seam (top-level-spec §7.1) before implementing. Outputs are
+// frozen A/B seam (top-level-spec Â§7.1) before implementing. Outputs are
 // tied to safe idle values so the top level elaborates and lints cleanly.
 //
 // TODO(lane b): implement, then DELETE the lint waivers below. They

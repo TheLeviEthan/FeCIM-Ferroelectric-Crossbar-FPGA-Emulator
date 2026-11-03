@@ -1,3 +1,4 @@
+`timescale 1ns/1ps
 module uart_rx (
     input logic clk, rst_n, tick_16x, rxd,
     output logic [7:0] rx_data,

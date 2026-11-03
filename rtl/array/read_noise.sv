@@ -1,11 +1,12 @@
+`timescale 1ns/1ps
 //=============================================================================
 // read_noise.sv -- Lane B
 //
 // Per-lane read-noise generator: 32-bit Galois LFSR, bell-shaped sum, READ_SIGMA/512 scale, +/-127 clamp.
-// Spec: mac-array-spec.md §5
+// Spec: mac-array-spec.md Â§5
 //
 // SKELETON. Port list is provisional -- confirm against the spec and the
-// frozen A/B seam (top-level-spec §7.1) before implementing. Outputs are
+// frozen A/B seam (top-level-spec Â§7.1) before implementing. Outputs are
 // tied to safe idle values so the top level elaborates and lints cleanly.
 //
 // TODO(lane b): implement, then DELETE the lint waivers below. They

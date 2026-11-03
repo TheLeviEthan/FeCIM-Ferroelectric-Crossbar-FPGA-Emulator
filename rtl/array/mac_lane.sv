@@ -1,10 +1,11 @@
+`timescale 1ns/1ps
 //=============================================================================
 // mac_lane.sv -- one crossbar column per pass.
 //
 // Week 2: clean datapath only. Read noise (week 5) adds noise_q at the w_n add;
 // ADC is shared at the drain-chain output, not in the lane.
 //
-// Pipeline (activation-buffer-spec.md §4):
+// Pipeline (activation-buffer-spec.md Â§4):
 //   N   : w_addr -> weight M9K address            acc_en high = row issued
 //   N+1 : M9K out -> w_align                      v1
 //   N+2 : w_n = w_align (+ noise), 9x9 multiply   v2 gates prod

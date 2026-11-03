@@ -1,12 +1,13 @@
+`timescale 1ns/1ps
 //=============================================================================
 // mac_array.sv -- Lane B
 //
 // Lane array: NUM_LANES x mac_lane with an adjacent-lane drain shift chain
 // toward lane 0.
-// Spec: mac-array-spec.md, rtl-conventions §6
+// Spec: mac-array-spec.md, rtl-conventions Â§6
 //
 // External port list is still provisional -- confirm against the frozen A/B
-// seam (top-level-spec §7.1). It is deliberately unchanged here so fecim_top
+// seam (top-level-spec Â§7.1). It is deliberately unchanged here so fecim_top
 // needs no edits. Write-port mapping: see "Weight write address" below.
 //=============================================================================
 module mac_array
