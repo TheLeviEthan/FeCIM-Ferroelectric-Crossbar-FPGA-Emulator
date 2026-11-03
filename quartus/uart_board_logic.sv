@@ -27,38 +27,37 @@ module uart_board_logic (
     // Framing error counter
     logic [7:0] frame_error_count;
 
-    // 50 MHz clock, approximately 921600 baud
+    // 50 MHz clock, 921600 baud, 16x oversampling
     localparam logic [15:0] BAUD_INC = 16'd19327;
 
-    // Baud rate generator
-    baud_gen #(
-        .BAUD_INC(BAUD_INC)
-    ) baud_inst (
-        .clk(clk),
-        .rst_n(rst_n),
-        .tick_16x(tick_16x)
+    // Baud generator: runtime input interface
+    baud_gen baud_inst (
+        .clk      (clk),
+        .rst_n    (rst_n),
+        .baud_inc (BAUD_INC),
+        .tick_16x (tick_16x)
     );
 
     // UART transmitter
     uart_tx tx_inst (
-        .clk(clk),
-        .rst_n(rst_n),
-        .tick_16x(tick_16x),
-        .tx_data(tx_data),
-        .tx_start(tx_start),
-        .tx_busy(tx_busy),
-        .txd(uart_tx_pin)
+        .clk      (clk),
+        .rst_n    (rst_n),
+        .tick_16x (tick_16x),
+        .tx_data  (tx_data),
+        .tx_start (tx_start),
+        .tx_busy  (tx_busy),
+        .txd     (uart_tx_pin)
     );
 
     // UART receiver
     uart_rx rx_inst (
-        .clk(clk),
-        .rst_n(rst_n),
-        .tick_16x(tick_16x),
-        .rxd(uart_rx_pin),
-        .rx_data(rx_data),
-        .rx_valid(rx_valid),
-        .rx_frame_err(rx_frame_err)
+        .clk          (clk),
+        .rst_n        (rst_n),
+        .tick_16x     (tick_16x),
+        .rxd          (uart_rx_pin),
+        .rx_data      (rx_data),
+        .rx_valid     (rx_valid),
+        .rx_frame_err (rx_frame_err)
     );
 
     // Echo controller
@@ -66,25 +65,21 @@ module uart_board_logic (
         if (!rst_n) begin
             tx_start          <= 1'b0;
             tx_data           <= 8'h00;
-
             echo_data         <= 8'h00;
             echo_pending      <= 1'b0;
-
             leds              <= 8'h00;
-
             frame_error_count <= 8'd0;
         end else begin
-            // Default: no new transmission request
             tx_start <= 1'b0;
 
-            // Receive byte and store for echo
+            // Store received byte
             if (rx_valid) begin
                 leds         <= rx_data;
                 echo_data    <= rx_data;
                 echo_pending <= 1'b1;
             end
 
-            // Echo buffered byte when transmitter is ready
+            // Echo when transmitter is ready
             if (echo_pending && !tx_busy && !tx_start) begin
                 tx_data      <= echo_data;
                 tx_start     <= 1'b1;
@@ -98,7 +93,6 @@ module uart_board_logic (
         end
     end
 
-    // Toggle LEDR[8] for each framing error
     assign error_led = frame_error_count[0];
 
 endmodule

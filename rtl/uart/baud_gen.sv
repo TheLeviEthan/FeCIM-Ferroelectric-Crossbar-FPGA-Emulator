@@ -17,6 +17,8 @@
 //   921600 baud -> 19327
 // ============================================================================
 
+
+
 module baud_gen (
     input  logic        clk,
     input  logic        rst_n,
@@ -24,16 +26,12 @@ module baud_gen (
     output logic        tick_16x
 );
 
-    // 16-bit phase accumulator
     logic [15:0] phase;
-
-    // 17-bit sum to preserve carry
     logic [16:0] phase_sum;
 
-    // Add programmable baud increment
-    assign phase_sum = {1'b0, phase} + {1'b0, baud_inc};
+    assign phase_sum = {1'b0, phase} +
+                       {1'b0, baud_inc};
 
-    // Generate one-clock-wide tick on accumulator overflow
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             phase    <= 16'd0;
