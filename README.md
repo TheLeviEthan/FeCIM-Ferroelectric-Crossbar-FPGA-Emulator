@@ -4,7 +4,7 @@ A digital RTL emulator of an analog ferroelectric (FeFET) compute-in-memory cros
 
 Computer Engineering capstone, University of Florida (CEN 4907C / 4908C), Fall 2026 – Spring 2027.
 
-> **Status: early development (semester 1).** The architecture, protocol and component specs are frozen, the shared package and C++ reference model are under active development, and the RTL hierarchy is wired with skeleton modules. See [Current state](#current-state) for detail.
+> **Status: pre-alpha (semester 1).** The architecture, protocol and component specs are frozen. The UART, packet parser/transmitter and a single MAC lane are implemented and pass their testbenches; one MAC lane is bit-exact against the C++ reference model in co-simulation; the rest of the RTL hierarchy is wired with skeleton modules. See [Current state](#current-state) for detail.
 
 ---
 
@@ -63,25 +63,30 @@ The reset state is an ideal crossbar (`NOISE_EN = 0`), so the clean datapath can
 
 ## Current state
 
-As of late October 2026:
+As of the pre-alpha (early November 2026):
 
 | Area | Status |
 |---|---|
 | Plan, protocol, RTL conventions, component specs | **Done.** Plan rev 4; register map reconciled across specs, package, RTL and model |
 | `rtl/fecim_pkg.sv` (shared parameters, types, protocol enums, hash/CRC functions) | **Done** (rev 4.1) |
-| RTL top level (`fecim_top.sv`) | **Wired.** Full hierarchy instantiated, A/B seam connected |
-| RTL leaf modules (UART, parser, FSM, write path, MAC lanes, result buffer, …) | **Skeletons.** Ports defined, outputs tied off; lint-clean under Verilator `-Wall` |
-| C++ reference model | **In progress.** Primitives (cell hash, CRC-8, LFSR, lane seeding), `model_ideal`, and `model_exact` clean path + conductance quantization implemented; **41/41 unit tests pass**. Other non-idealities throw if enabled rather than silently returning clean results |
+| RTL top level (`fecim_top.sv`) | **Wired.** Full hierarchy instantiated, A/B seam connected. Full-design lint fails until `mac_array` is updated for `mac_lane`'s new ports (Lane B) |
+| UART (`baud_gen`, `uart_rx`, `uart_tx`) | **Implemented.** Fractional baud generator; `tb_uart` (260-byte loopback at 921600) passes; `tb_uart_edge` needs updating for `baud_gen`'s `baud_inc` port |
+| Packet layer (`packet_parser`, `packet_tx`) | **Implemented.** CRC-8, length/range checks, timeout; `tb_packet_parser` and `tb_packet_tx` pass; `-Wall` lint cleanup pending |
+| MAC lane (`mac_lane`) | **Implemented, clean datapath.** 9×9 signed multiply, 32-bit accumulator, drain shift; `tb_mac_lane` passes and the L0 co-sim harness agrees with the model every cycle |
+| 9×9 multiplier packing | **Verified** in Quartus 25.1std: two signed 9×9 multiplies share one embedded multiplier block ([`quartus/reports/`](quartus/reports)) |
+| Other RTL leaves (control FSM, config, write path, array, result buffer, …) | **Skeletons.** Ports defined, outputs tied off |
+| A/B seam | Integration testbench drives Lane A and Lane B stubs through the frozen signal list; passes |
+| C++ reference model | **In progress.** Primitives (cell hash, CRC-8, LFSR, lane seeding), `model_ideal`, and `model_exact` clean path + conductance quantization implemented; **58/58 unit tests pass**. Other non-idealities throw if enabled rather than silently returning clean results |
 | Golden vectors, single `mac_lane` (clean datapath) | **Done.** 261 directed and random cases, cross-checked against `model_exact`, regeneration checked in CI |
-| Device calibration | **In progress.** Parameter set A extracted (dual-port HfO₂ FeFET, Chatterjee et al., IEEE TED 2022); candidates for sets B and C identified |
-| Verilator co-simulation harness | Not started |
-| Python host package (`fpga` / `sim` backends) | Not started (parameter-set schema and data only) |
-| Quartus project and pin constraints | Not yet in repo |
+| Verilator co-simulation | **Single-lane L0 slice done.** `model/cosim/run_l0`: Verilated `mac_lane` == `model_exact` == `model_ideal`, every cycle and every pass, lanes 0/5/63 in CI. Full-array L0 waits on the array and `ModelExact::step()` |
+| Device calibration | **In progress.** Parameter sets extracted: `dualport_fefet_mlc` (Chatterjee et al., IEEE TED 2022) and `gf28_hkmg` (Soliman et al., Nat. Commun. 2023) |
+| Python host package | **In progress.** Packet codec (CRC-8, framing), response decoder, loopback transport, weight mapping and sweep scaffolding with tests; packaging (`pyproject.toml`) and backends not yet |
+| Quartus | Pin constraints and the DSP-packing experiment in repo; board build project script pending |
 
 **Next milestones**
 
 1. **Hardware gate:** UART loopback and `IDENTIFY` response from the board at 921600 baud.
-2. **L0 co-simulation gate:** Verilated RTL and `model_exact` agree cycle for cycle on the clean datapath.
+2. **L0 co-simulation gate:** Verilated RTL and `model_exact` agree cycle for cycle on the clean datapath (single lane: done; full array: next).
 3. **MVP demo:** 64×64 tile, 32 lanes, quantization + D2D + stuck-at + read noise, digit classifier running on hardware.
 4. **Semester 1 target:** full 128×128 tile with all six non-idealities, calibrated against at least one published parameter set.
 5. **Semester 2:** multi-tile support, differential-pair modelling, retention drift, and a cross-process comparison across three published FeFET datasets.
@@ -97,7 +102,8 @@ As of late October 2026:
 ├── model/                  C++17 reference model, no dependencies (Lane C)
 │   ├── include/fecim/      params, primitives, write path, model_ideal, model_exact
 │   ├── src/  tests/
-│   └── cosim/              Verilator co-simulation harness (planned)
+│   ├── examples/           fecim_demo (pre-alpha model demo)
+│   └── cosim/              Verilator co-simulation harness (single-lane L0)
 ├── tb/golden/              shared test fixtures, consumed by RTL, C++ and Python tests
 ├── sw/                     Python host package (Lane D)
 │   └── fecim/parameter_sets/   one YAML per published device source
@@ -113,7 +119,8 @@ As of late October 2026:
 ```bash
 cmake -S model -B build
 cmake --build build
-./build/model_tests
+./build/model_tests        # unit tests
+./build/fecim_demo         # demo: clean path bit-exact, then quantization error at N levels
 ```
 
 **Golden vectors** (Python 3, standard library only):
@@ -130,7 +137,22 @@ verilator --lint-only -Wall --top-module fecim_top \
   rtl/fecim_pkg.sv $(find rtl -name '*.sv' -not -name 'fecim_pkg.sv')
 ```
 
-CI runs all of the above on every push and pull request. The workflow also defines co-simulation and Python test jobs; those are expected to fail until `model/cosim/` and the `sw/` package exist.
+**RTL testbenches** (Verilator ≥ 5 for `--timing`; CI uses 5.020):
+
+```bash
+tb/run_sims.sh                 # all self-checking testbenches
+tb/run_sims.sh tb_mac_lane     # or just one
+```
+
+**L0 co-simulation** (Verilated `mac_lane` against the C++ model):
+
+```bash
+make -C model/cosim            # builds model/cosim/run_l0
+./model/cosim/run_l0           # optional args: [seed] [n_random]
+make -C model/cosim clean && make -C model/cosim LANE_ID=63   # another lane
+```
+
+CI runs all of the above on every push and pull request. Known gaps: the full-design lint step fails until `mac_array` matches `mac_lane`'s ports, the `mac_array`/`packet_parser`/`packet_tx` standalone lint steps are non-blocking until their `-Wall` fixes land, `tb_uart_edge` is left out of the CI sim list until it builds, and the Python test job is skipped (green, with a notice) until `sw/pyproject.toml` exists.
 
 ## Hardware setup
 
