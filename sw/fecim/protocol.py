@@ -63,7 +63,7 @@ def verify_crc(packet: bytes) -> bool:
     if len(packet) < 2:
         return False
     
-    # Exclude the sync byte at index 0 and the trailing CRC byte[cite: 7]
+    # Exclude the sync byte at index 0 and the trailing CRC byte
     data_to_check = packet[1:-1]
     received_crc = packet[-1]
     
