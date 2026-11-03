@@ -44,15 +44,19 @@ rows.hex    1 + 3 words per row:   weight    act       running
 
 Run cases **in file order without resetting the weight memory** between them.
 
-1. Tie `noise_en = NOISE_NONE`, `read_sigma = 0`, `reseed = 0`, and
-   `lane_sel = LANE_ID` of the instance under test.
-2. If WRITE: one `lane_we` pulse per row, `lane_waddr = pass*TILE_ROWS + r`,
-   `lane_wdata = weight`.
+Port names are `mac_lane.sv`'s as of 29 Oct (global write address; the old
+skeleton's `lane_we`/`lane_sel`/`lane_waddr`/`act` are gone).
+
+1. Tie `noise_en = NOISE_NONE`, `shift_en = 0`. Pick the instance's `LANE_ID`;
+   it owns columns `col = pass * NUM_LANES + LANE_ID`.
+2. If WRITE: one `wt_we` pulse per row, `wt_addr = col * TILE_ROWS + r` (the
+   global, column-major bulk address), `wt_data = weight`. The lane keeps a write
+   only when `col % NUM_LANES == LANE_ID`.
 3. Pulse `acc_clear` for one cycle (the control FSM's `CLEAR` state).
 4. Issue rows back to back: `w_addr = pass*TILE_ROWS + r`, `acc_en = 1`, one row
    per cycle, then `acc_en = 0` and hold `LANE_PIPE_DEPTH` cycles — the same
    sequence as `issue_rows` in `tb/integration/lane_a_stub.sv`.
-5. Drive `act` **two cycles behind** `w_addr` for the same row. In the array,
+5. Drive `act_bcast` **two cycles behind** `w_addr` for the same row. In the array,
    `act_bcast` comes out of the activation M9K plus its broadcast register
    (activation-buffer-spec §4), so the lane sees row `r`'s activation two cycles
    after it saw row `r`'s address. Drive something non-zero (e.g. `8'hA5`) when no
