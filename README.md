@@ -206,6 +206,18 @@ xbar = Crossbar(backend="sim")                          # C++ reference model vi
 - [Host driver](docs/plans%20and%20specs/05-lane-d-host/host-driver-spec.md) and [application](docs/plans%20and%20specs/05-lane-d-host/application-spec.md) specs
 - Calibration: [device model](docs/plans%20and%20specs/06-physics-calibration/device-model.md), [cell physics derivation](docs/plans%20and%20specs/06-physics-calibration/cell-physics-derivation.md), [literature survey](docs/plans%20and%20specs/06-physics-calibration/literature-survey.md)
 
+## Troubleshooting & Resolved Bugs
+
+- [x] **Golden Vector Fixture Format & Loader Drift**
+  - *Symptom*: `tb/golden/packet_vectors.bin.hex` contained legacy pre-freeze format specs (CRC-16-CCITT, old opcodes, no LEN field) while test loader scripts incorrectly parsed comment lines or label tokens (e.g., `1B`, `2B`, `4B`) as hex bytes, silently disabling cross-language validation checks.
+  - *Root Cause*: Outdated fixture encodings combined with lax string-parsing logic in `test_packet_vectors_integrity` / `test_transport_golden.py`.
+  - *Resolution*: Updated vector files and parser loader scripts to enforce frozen protocol framing (`[A5][CMD][LEN:2][PAYLOAD][CRC-8/ATM]`) and properly skip non-hex comment lines and structural tokens.
+
+- [x] **RTL `mac_array.sv` Port Mapping & CI Lint Failure**
+  - *Symptom*: Full-design CI lint failed with 8 `PINNOTFOUND` errors, turning the `main` branch red for all developers.
+  - *Root Cause*: `mac_array.sv` was wired to legacy skeleton signals (`lane_we`, `lane_sel`, `lane_waddr`, `lane_wdata`, `act`, `read_sigma`, `noise_seed`, `reseed`) instead of the updated `mac_lane` interface signals (`wt_we`, `wt_addr`, `wt_data`, `act_bcast`).
+  - *Resolution*: Applied a port mapping fix in `mac_array.sv` to correctly connect the new `mac_lane` interface signals, restoring green CI status.
+
 ## License
 
 [MIT](LICENSE) © 2026 Ethan Ruddell

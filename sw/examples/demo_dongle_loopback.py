@@ -22,7 +22,7 @@ def run_dongle_loopback():
         print("Serial port opened successfully.")
         
         # Generate 4096 random bytes
-        test_data = os.urandom(4096)
+        test_data = [0xA5]
         print(f"Sending {len(test_data)} bytes through TX->RX loopback...")
         
         start_time = time.time()
@@ -34,6 +34,7 @@ def run_dongle_loopback():
             chunk = transport.read(len(test_data) - len(received_data))
             if not chunk:
                 break
+            print(f"{chunk}")
             received_data.extend(chunk)
             
         elapsed_time = time.time() - start_time
