@@ -3,6 +3,9 @@ Dongle Self-Loopback & Physical Transport Verification Script
 (sw/examples/demo_dongle_loopback.py)
 """
 
+# $env:PYTHONPATH="sw"
+# python .\sw\examples\demo_dongle_loopback.py COM6
+
 import os
 import time
 import sys
@@ -54,7 +57,7 @@ def run_dongle_loopback():
         print("-" * 50)
         
         if errors == 0:
-            print("SUCCESS: 4096 bytes echoed with 0 errors!")
+            print(f"SUCCESS: {test_data.size()} byte(s) echoed with 0 errors!")
         else:
             print(f"FAILURE: Detected {errors} corruption errors.")
             
