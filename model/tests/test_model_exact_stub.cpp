@@ -82,12 +82,6 @@ TEST(stub_register_interface_throws) {
     CHECK_THROWS(m.reseed(), std::logic_error);
 }
 
-TEST(stub_write_path_stages_throw) {
-    CHECK_THROWS(cell_addr(0, 0), std::logic_error);
-    CHECK_THROWS(d2d_offset(0, 0, 0u, 0), std::logic_error);
-    CHECK_THROWS(apply_stuck(0, 0, 0u, 0u), std::logic_error);
-}
-
 TEST(stub_read_path_throws) {
     CHECK_THROWS(read_noise_q(1u, 0), std::logic_error);
     CHECK_THROWS(ir_attenuate(255, 0xFF), std::logic_error);

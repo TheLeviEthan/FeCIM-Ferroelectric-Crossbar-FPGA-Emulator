@@ -9,6 +9,7 @@
 #include <stdexcept>
 
 #include "fecim/params.h"
+#include "fecim/primitives.h"
 
 namespace fecim {
 
@@ -54,21 +55,88 @@ std::int8_t quantize_weight(std::int8_t   w_ideal,
     return static_cast<std::int8_t>(w_q);
 }
 
-// ---- week-3 stubs ---------------------------------------------------------
-// Signatures are final; bodies land with the hash/LFSR work in week 3.
-// Throwing (rather than returning the input unchanged) means nothing can
-// pass an L1/L2 comparison by accident before they exist.
+// ---- stages 2 and 3: D2D variation and stuck-at faults --------------------
 
-std::uint16_t cell_addr(int, int) {
-    throw std::logic_error("cell_addr: not implemented yet (week 3)");
+namespace {
+
+// Arithmetic shift right that rounds toward minus infinity, like SV's `>>>`
+// on a signed operand. Written out because `>>` on a negative int is
+// implementation-defined before C++20 (every mainstream compiler does the
+// arithmetic shift, but the model should not depend on that). For x < 0,
+// ~x = -x - 1 >= 0, so the shift below is on a non-negative value.
+constexpr int asr(int x, int n) {
+    return x >= 0 ? (x >> n) : ~((~x) >> n);
+}
+static_assert(asr(-1, 8) == -1 && asr(-256, 8) == -1 && asr(-257, 8) == -2 &&
+              asr(255, 8) == 0 && asr(256, 8) == 1,
+              "asr must floor, as SV >>> does");
+
+// The 16-bit hash seed for one salt: noise_seed[15:0] ^ salt. Only the low
+// 16 bits of the 32-bit NOISE_SEED register reach the write path.
+std::uint16_t hash_seed(std::uint32_t noise_seed, std::uint16_t salt) {
+    return static_cast<std::uint16_t>((noise_seed & 0xFFFFu) ^ salt);
 }
 
-std::int8_t d2d_offset(std::int8_t, std::uint16_t, std::uint32_t, std::uint8_t) {
-    throw std::logic_error("d2d_offset: not implemented yet (week 3)");
+} // namespace
+
+std::uint16_t cell_addr(int row, int col) {
+    // Global, column-major: the same index as the bulk weight stream's
+    // bulk_addr, so the RTL can hash bulk_addr directly. Unlike the datapath
+    // functions this is an index helper, so out-of-range arguments are a
+    // caller bug and throw (a silently wrapped address would hash the wrong
+    // cell and pass every self-consistency test).
+    if (row < 0 || row >= TILE_ROWS || col < 0 || col >= TILE_COLS)
+        throw std::out_of_range("cell_addr: row/col outside the tile");
+    return static_cast<std::uint16_t>(col * TILE_ROWS + row);
 }
 
-std::int8_t apply_stuck(std::int8_t, std::uint16_t, std::uint32_t, std::uint32_t) {
-    throw std::logic_error("apply_stuck: not implemented yet (week 3)");
+std::int8_t d2d_offset(std::int8_t   w_q,
+                       std::uint16_t addr,
+                       std::uint32_t noise_seed,
+                       std::uint8_t  d2d_sigma) {
+    const std::uint16_t h = cell_hash16(addr, hash_seed(noise_seed, SEED_D2D));
+
+    // Two hash bytes summed: triangular on 0..510, centred to -255..+255.
+    // write-path-spec §5.1: ih9 = h[7:0] + h[15:8] - 255.
+    const int ih9 = static_cast<int>(h & 0xFFu) + static_cast<int>(h >> 8) - 255;
+
+    // Scale by D2D_SIGMA / 256 (§5.2): a 9x9 signed multiply, then >>> 8.
+    // |ih9 * sigma| <= 255 * 255 = 65025, so the product fits in an int and
+    // the scaled offset lies in -255..+254.
+    const int scaled = asr(ih9 * static_cast<int>(d2d_sigma), 8);
+
+    // Saturating add (§5.2). Never wrap: +127 plus a positive offset must
+    // stay +127, not become -128.
+    const int sum = static_cast<int>(w_q) + scaled;
+    const int sat = sum > 127 ? 127 : (sum < -128 ? -128 : sum);
+    return static_cast<std::int8_t>(sat);
+}
+
+std::int8_t apply_stuck(std::int8_t   w_var,
+                        std::uint16_t addr,
+                        std::uint32_t noise_seed,
+                        std::uint32_t stuck_rate) {
+    // Hit test (§5.3): a cell is stuck when its stuck hash falls below
+    // STUCK_RATE[15:0], so the fault rate is rate / 65536. A rate of 0 never
+    // hits; the largest rate, 65535, misses only the one cell whose hash is
+    // 0xFFFF. Raising the rate only ever adds stuck cells.
+    const std::uint16_t h_stuck = cell_hash16(addr, hash_seed(noise_seed, SEED_STUCK));
+    if (h_stuck >= (stuck_rate & 0xFFFFu))
+        return w_var;                                   // not stuck: unchanged
+
+    // Mode, STUCK_RATE[16]: 0 = stuck-at-zero (fully depolarized cell).
+    if (((stuck_rate >> 16) & 1u) == 0u)
+        return 0;
+
+    // Mode 1 = stuck-at-rail, w = +/-127. The sign comes from the D2D hash's
+    // top bit, because every bit of h_stuck is used by the compare above.
+    // Convention (recorded in write-path-spec §5.3): h_d2d[15] = 1 means
+    // -127, i.e. the sign of h_d2d read as an int16. The D2D hash is computed
+    // here whether or not NOISE_EN.d2d is set; that is deliberate, and the
+    // RTL must do the same.
+    const std::uint16_t h_d2d = cell_hash16(addr, hash_seed(noise_seed, SEED_D2D));
+    return (h_d2d & 0x8000u) ? static_cast<std::int8_t>(-127)
+                             : static_cast<std::int8_t>(127);
 }
 
 } // namespace fecim
