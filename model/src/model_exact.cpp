@@ -1,8 +1,11 @@
 #include "fecim/model_exact.h"
 
+#include <algorithm>
 #include <stdexcept>
 #include <string>
 
+#include "fecim/primitives.h"
+#include "fecim/read_path.h"
 #include "fecim/write_path.h"
 
 namespace fecim {
@@ -22,7 +25,15 @@ void check_col(int col) {
 ModelExact::ModelExact()
     : weights_(static_cast<std::size_t>(TILE_ROWS) * TILE_COLS, 0),
       act_(TILE_ROWS, 0),
-      atten_(TILE_ROWS, 0xFF) {}
+      atten_(TILE_ROWS, 0xFF),
+      lfsr_(NUM_LANES, 0) {
+    reseed();   // reset: every LFSR loads lane_seed(NOISE_SEED = 0, l)
+}
+
+void ModelExact::reseed() {
+    for (int l = 0; l < NUM_LANES; ++l)
+        lfsr_[static_cast<std::size_t>(l)] = lane_seed(cfg_.noise_seed, l);
+}
 
 void ModelExact::set_config(const Config& cfg) {
     if (cfg.active_rows < 1 || cfg.active_rows > TILE_ROWS)
@@ -81,28 +92,54 @@ std::int8_t ModelExact::stored_weight(int row, int col) const {
 }
 
 std::vector<std::int32_t> ModelExact::compute() {
-    // Non-idealities implemented so far. Anything else still throws rather
-    // than silently returning clean results, which would let an L1/L2
-    // comparison pass for the wrong reason. Add each bit as it lands.
+    // All six non-idealities. Quant, D2D and stuck-at are programming-time
+    // effects already baked into weights_ by write_weight(); this function
+    // adds the three read-time ones, each where the RTL applies it:
     //
-    // Quant, D2D and stuck-at need nothing in this function: all three are
-    // programming-time effects, applied to the stored weights in
-    // write_weight(), so the clean MAC loop below is already correct for
-    // them. Read noise, IR drop and ADC act at read time and land in C2.
-    constexpr unsigned kImplemented = NOISE_QUANT | NOISE_D2D | NOISE_STUCK;
-    if ((static_cast<unsigned>(cfg_.noise_en) & ~kImplemented) != 0u)
-        throw std::logic_error("model_exact: non-idealities not implemented yet");
+    //   act_buffer : a = NOISE_EN.ir ? ir_attenuate(act[r], atten[r]) : act[r]
+    //   mac_lane   : w_n = w + (NOISE_EN.read ? noise_q : 0);  acc += w_n * a
+    //   drain      : y = NOISE_EN.adc ? adc_quantize(acc, ADC_BITS) : acc
+    //
+    // Iteration order is the RTL's, because the read-noise LFSRs make it
+    // observable: pass-major, row-minor, and on every issued row EVERY lane
+    // steps its LFSR -- all NUM_LANES lanes (including those whose column is
+    // at or beyond active_cols, which still accumulate garbage that argmax
+    // masks), on every pass, whether or not NOISE_EN.read is set. The row's
+    // sample comes from the state after its step (read_path.h, alignment).
+    const bool en_read = (cfg_.noise_en & NOISE_READ) != 0;
+    const bool en_ir   = (cfg_.noise_en & NOISE_IR)   != 0;
+    const bool en_adc  = (cfg_.noise_en & NOISE_ADC)  != 0;
+    // ADC_BITS is a 5-bit port in the RTL; adc_quantize() uses bits [4:0].
+    const auto adc_bits = static_cast<std::uint8_t>(cfg_.adc_bits & 0x1F);
 
-    // Clean path. Integer addition is associative, so row order does not
-    // matter for the clean case; once read noise lands, iterate in the RTL's
-    // sequence (pass-major, row-minor) because the LFSR advances per row.
+    // The sequencer rounds the pass count up and drains full lane groups
+    // (control-fsm-spec §3).
+    const int passes = (cfg_.active_cols + NUM_LANES - 1) / NUM_LANES;
+
     std::vector<std::int32_t> y(static_cast<std::size_t>(cfg_.active_cols), 0);
-    for (int c = 0; c < cfg_.active_cols; ++c) {
-        std::int32_t acc = 0;
-        for (int r = 0; r < cfg_.active_rows; ++r)
-            acc += std::int32_t{weights_[widx(r, c)]} *
-                   std::int32_t{act_[static_cast<std::size_t>(r)]};
-        y[static_cast<std::size_t>(c)] = acc;
+    std::vector<std::int32_t> acc(static_cast<std::size_t>(NUM_LANES));
+
+    for (int p = 0; p < passes; ++p) {
+        std::fill(acc.begin(), acc.end(), 0);                  // CLEAR, once per pass
+        for (int r = 0; r < cfg_.active_rows; ++r) {           // ACC, one row per cycle
+            const std::uint8_t a_raw = act_[static_cast<std::size_t>(r)];
+            const std::int32_t a = en_ir
+                ? std::int32_t{ir_attenuate(a_raw, atten_[static_cast<std::size_t>(r)])}
+                : std::int32_t{a_raw};
+            for (int l = 0; l < NUM_LANES; ++l) {
+                auto& s = lfsr_[static_cast<std::size_t>(l)];
+                s = lfsr_step(s);                              // acc_en: every lane steps
+                std::int32_t w_n = weights_[widx(r, p * NUM_LANES + l)];
+                if (en_read) w_n += read_noise_q(s, cfg_.read_sigma);   // |w_n| <= 254
+                acc[static_cast<std::size_t>(l)] += w_n * a;
+            }
+        }
+        for (int l = 0; l < NUM_LANES; ++l) {                  // DRAIN, through the shared ADC
+            const int c = p * NUM_LANES + l;
+            if (c >= cfg_.active_cols) continue;               // drained but never read
+            const std::int32_t v = acc[static_cast<std::size_t>(l)];
+            y[static_cast<std::size_t>(c)] = en_adc ? adc_quantize(v, adc_bits) : v;
+        }
     }
     return y;
 }
@@ -130,6 +167,5 @@ std::vector<std::int32_t> ModelExact::results() const { not_yet("results"); }
 ModelExact::Argmax ModelExact::argmax() const        { not_yet("argmax"); }
 Status ModelExact::set_reg(std::uint8_t, std::uint32_t)        { not_yet("set_reg"); }
 Status ModelExact::get_reg(std::uint8_t, std::uint32_t&) const { not_yet("get_reg"); }
-void ModelExact::reseed()                            { not_yet("reseed"); }
 
 } // namespace fecim

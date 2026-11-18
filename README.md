@@ -76,8 +76,9 @@ As of the pre-alpha (early November 2026):
 | 9×9 multiplier packing | **Verified** in Quartus 25.1std: two signed 9×9 multiplies share one embedded multiplier block ([`quartus/reports/`](quartus/reports)) |
 | Other RTL leaves (control FSM, config, write path, array, result buffer, …) | **Skeletons.** Ports defined, outputs tied off |
 | A/B seam | Integration testbench drives Lane A and Lane B stubs through the frozen signal list; passes |
-| C++ reference model | **In progress.** Primitives (cell hash, CRC-8, LFSR, lane seeding), `model_ideal`, and `model_exact` clean path plus all three write-time non-idealities (quantization, D2D variation, stuck-at faults) implemented; **86/86 unit tests pass**. Read noise, IR drop and ADC throw if enabled rather than silently returning clean results |
+| C++ reference model | **In progress.** Primitives (cell hash, CRC-8, LFSR, lane seeding), `model_ideal`, and `model_exact` with all six non-idealities (quantization, D2D variation, stuck-at faults, read noise, IR drop, ADC) implemented; **116/116 unit tests pass**. The cycle-level and register interfaces (`step()`, CSR access) are stubs, task C3 |
 | Golden vectors, write path | **Done.** 6,560 cases over 35 register configurations (quant, D2D, stuck-at, combinations), plus an exhaustive `cell_hash16` table; independent Python generator cross-checked against `model_exact`, regeneration checked in CI |
+| Golden vectors, read path | **Done.** Read noise (noise table, LFSR sequences, 21 `mac_lane` cases with noise), IR drop (exhaustive multiplier checksum, 7 `act_buffer` profiles), ADC (1,330 cases), and 17 whole computes mixing all six non-idealities up to the full 128×128 tile; independent Python generator cross-checked against `model_exact`, regeneration checked in CI |
 | Golden vectors, single `mac_lane` (clean datapath) | **Done.** 261 directed and random cases, cross-checked against `model_exact`, regeneration checked in CI |
 | Verilator co-simulation | **Single-lane L0 slice done.** `model/cosim/run_l0`: Verilated `mac_lane` == `model_exact` == `model_ideal`, every cycle and every pass, lanes 0/5/63 in CI. Full-array L0 waits on the array and `ModelExact::step()` |
 | Device calibration | **In progress.** Parameter sets extracted: `dualport_fefet_mlc` (Chatterjee et al., IEEE TED 2022) and `gf28_hkmg` (Soliman et al., Nat. Commun. 2023) |
@@ -129,6 +130,7 @@ cmake --build build
 ```bash
 python3 tb/golden/mac_lane/gen_mac_lane_vectors.py --check   # verify committed files are current
 python3 tb/golden/mac_lane/gen_mac_lane_vectors.py           # regenerate
+python3 tb/golden/gen_read_path_vectors.py --check           # read noise, IR drop, ADC, whole computes
 ```
 
 **RTL lint** (Verilator; the package must be listed first):

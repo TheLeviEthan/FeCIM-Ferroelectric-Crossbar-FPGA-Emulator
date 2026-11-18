@@ -153,6 +153,21 @@ identical seeds and inputs produce different results depending on host timing.
 That destroys reproducibility, which destroys the RTL-versus-model equivalence tests, which
 are the foundation the whole verification plan rests on.
 
+**Alignment and advance rules (fixed by the model, Nov 2026).** `model_exact` and the
+golden vectors in `tb/golden/read_noise/` and `tb/golden/mvm/` assume all of these; the RTL
+must match them bit for bit:
+
+- A row's noise sample is computed from the LFSR state **after** that row's advance. The
+  first accumulate after reset or `reseed` therefore uses `lfsr_step(seed_eff)`, never
+  `seed_eff` itself.
+- The LFSR advances on every `acc_en`, **whether or not `NOISE_EN.read` is set**. A clean
+  compute still moves the sequence on.
+- Every lane advances on every issued row, including lanes whose column is beyond
+  `ACTIVE_COLS`, in both passes. Lane `l` serves column `l` in pass 0 and `l + 64` in
+  pass 1 from one continuing sequence.
+- Only reset and `reseed` (`CTRL[2]`) reload the LFSR. Writing `NOISE_SEED` alone does
+  not, and nothing reloads it between computes.
+
 ### 5.3 Uniform to bell-shaped, within 9 bits
 
 ```systemverilog

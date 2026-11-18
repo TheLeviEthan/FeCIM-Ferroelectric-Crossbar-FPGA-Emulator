@@ -188,7 +188,7 @@ happened.
 | D2D only, σ ∈ {0, 8, 32, 255} | ✓ | ✓ | ✓ | ✓ |
 | Read noise only | ✓ | ✓ | ✓ | ✓ |
 | Stuck only, rate ∈ {0, 1%, 10%} | ✓ | ✓ | ✓ | ✓ |
-| ADC only, bits ∈ {4, 8, 16, 32} | ✓ | ✓ | ✓ | ✓ |
+| ADC only, bits ∈ {4, 8, 16, 24} | ✓ | ✓ | ✓ | ✓ |
 | IR only | ✓ | ✓ | ✓ | ✓ |
 | All enabled | ✓ | ✓ | ✓ | ✓ |
 | Tile 8×8, 32×32, 48×48, 128×128 | ✓ | ✓ | — | ✓ |
@@ -196,6 +196,9 @@ happened.
 Non-power-of-two quantization levels (3, 5) and non-multiple-of-64 tile widths (48) are there
 deliberately — they exercise the reciprocal path and the argmax mask that powers of two would
 hide.
+
+`ADC_BITS` reaches the ADC through a 5-bit port (`adc_bits[4:0]`), so a register value of
+32 is the 0-bit case, not "ADC off". Any value from 24 (`ACC_USED_W`) to 31 is an exact no-op.
 
 ### 6.2 Corner cases, enumerated
 

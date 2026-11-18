@@ -407,18 +407,16 @@ TEST(model_quant_activations_untouched) {
         CHECK_EQ(y[static_cast<std::size_t>(c)], std::int32_t{c});
 }
 
-TEST(model_quant_compute_enabled_others_still_throw) {
-    // compute() accepts the write-time effects (quant, D2D, stuck-at); the
-    // read-time ones still throw until C2 implements them, alone or combined
-    // with quant.
+TEST(model_quant_compute_accepts_every_enable_combination) {
+    // compute() implements all six non-idealities, so every NOISE_EN value
+    // runs, alone or combined with quant, and returns active_cols results.
+    // (Behaviour of the read-time effects: test_read_path.cpp.)
     ModelExact m;
-    m.set_config(quant_config(8));
-    CHECK(m.compute().size() == static_cast<std::size_t>(TILE_COLS));
-    for (std::uint8_t bit : {NOISE_READ, NOISE_IR, NOISE_ADC}) {
+    for (unsigned en = 0; en < 64u; ++en) {
         Config cfg = quant_config(8);
-        cfg.noise_en = static_cast<std::uint8_t>(NOISE_QUANT | bit);
+        cfg.noise_en = static_cast<std::uint8_t>(en);
         m.set_config(cfg);
-        CHECK_THROWS(m.compute(), std::logic_error);
+        CHECK(m.compute().size() == static_cast<std::size_t>(TILE_COLS));
     }
 }
 
