@@ -11,7 +11,9 @@ module packet_parser import fecim_pkg::*; (
     output logic cfg_we,
     output logic [7:0] cfg_addr,
     output logic [31:0] cfg_wdata,
-    input logic [31:0] cfg_rdata,
+     /* verilator lint_off UNUSEDSIGNAL */
+    input logic [31:0] cfg_rdata,   // TODO: GET_CONFIG response not implemented
+    /* verilator lint_on UNUSEDSIGNAL */
     output logic start_compute,
     input logic compute_busy, compute_done,
     output logic rd_go, rd_argmax,
@@ -61,8 +63,8 @@ module packet_parser import fecim_pkg::*; (
                 if (payload_len != 0) dispatch_status = ST_BAD_LEN;
             CMD_READ_RESULT: begin
                 if (payload_len != 16'd4) dispatch_status = ST_BAD_LEN;
-                else if (read_count_word == 0 || read_count_word > TILE_COLS ||
-                         read_start_word >= TILE_COLS ||
+                else if (read_count_word == 0 || read_count_word > 16'(TILE_COLS) ||
+                         read_start_word >= 16'(TILE_COLS) ||
                          (int'(read_start_word) + int'(read_count_word)) > TILE_COLS)
                     dispatch_status = ST_ADDR_RANGE;
             end
@@ -141,7 +143,7 @@ module packet_parser import fecim_pkg::*; (
                     PKT_LEN1: if (rx_valid) begin
                         crc <= crc8_byte(crc, rx_data);
                         payload_len <= next_length;
-                        if (next_length > MAX_PAYLOAD) begin
+                        if (next_length > 16'(MAX_PAYLOAD)) begin
                             resp_cmd <= command;
                             resp_status <= ST_BAD_LEN;
                             resp_len <= 0;
@@ -154,7 +156,7 @@ module packet_parser import fecim_pkg::*; (
                     end
                     PKT_PAYLOAD: if (rx_valid) begin
                         crc <= crc8_byte(crc, rx_data);
-                        if (payload_idx < 5) small_payload[payload_idx] <= rx_data;
+                        if (payload_idx < 5) small_payload[payload_idx[2:0]] <= rx_data;
                         if (payload_idx == 0) begin
                             stream_addr[7:0] <= rx_data;
                             read_start_word[7:0] <= rx_data;

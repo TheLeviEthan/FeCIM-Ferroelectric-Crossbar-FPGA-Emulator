@@ -46,13 +46,21 @@ void ModelExact::write_weight(int row, int col, std::int8_t w) {
     // Stage 1 uses the QUANT_MULT *register* value, not
     // quant_mult_for(quant_levels): the RTL uses whatever the host wrote,
     // so the model must too, even for a mismatched pair.
+    //
+    // Stages 2 and 3 key their hashes on the GLOBAL cell address
+    // (col * TILE_ROWS + row, the bulk_addr of the weight stream) and on the
+    // NOISE_SEED in effect now. Reseeding later does not re-randomize cells
+    // already written; the host reloads weights after changing the seed,
+    // D2D_SIGMA or STUCK_RATE, just as with QUANT_LEVELS.
+    const std::uint16_t addr = cell_addr(row, col);
     if (cfg_.noise_en & NOISE_QUANT)
         w = quantize_weight(w,
                             static_cast<std::uint8_t>(cfg_.quant_levels),
                             cfg_.quant_mult);
-    // TODO(lane C, week 3): stage 2, d2d via cell_hash16 on the GLOBAL cell
-    //                       address (col * TILE_ROWS + row).
-    // TODO(lane C, week 3): stage 3, stuck-at. Overrides stages 1 and 2.
+    if (cfg_.noise_en & NOISE_D2D)
+        w = d2d_offset(w, addr, cfg_.noise_seed, cfg_.d2d_sigma);
+    if (cfg_.noise_en & NOISE_STUCK)                  // overrides stages 1 and 2
+        w = apply_stuck(w, addr, cfg_.noise_seed, cfg_.stuck_rate);
     weights_[widx(row, col)] = w;
 }
 
@@ -77,10 +85,11 @@ std::vector<std::int32_t> ModelExact::compute() {
     // than silently returning clean results, which would let an L1/L2
     // comparison pass for the wrong reason. Add each bit as it lands.
     //
-    // Quant needs nothing in this function: it was applied to the stored
-    // weights in write_weight(), so the clean MAC loop below is already
-    // correct for it.
-    constexpr unsigned kImplemented = NOISE_QUANT;
+    // Quant, D2D and stuck-at need nothing in this function: all three are
+    // programming-time effects, applied to the stored weights in
+    // write_weight(), so the clean MAC loop below is already correct for
+    // them. Read noise, IR drop and ADC act at read time and land in C2.
+    constexpr unsigned kImplemented = NOISE_QUANT | NOISE_D2D | NOISE_STUCK;
     if ((static_cast<unsigned>(cfg_.noise_en) & ~kImplemented) != 0u)
         throw std::logic_error("model_exact: non-idealities not implemented yet");
 

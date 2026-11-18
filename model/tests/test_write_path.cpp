@@ -21,6 +21,10 @@
 //                        6348 (2023), and Duan et al., IEDM 2024 (survey
 //                        §2.4, Levels table). Set B candidate.
 //
+// Stages 2 and 3 (D2D variation, stuck-at faults) are tested in
+// test_write_path_d2d_stuck.cpp, and every stage is replayed against the
+// shared golden vectors in test_write_path_vectors.cpp.
+//
 // These mirror write-path-spec §9 tests 3, 4, 5 and 12, so the RTL
 // testbench can pin the SAME vectors. The golden table is the shared
 // contract; keep it in sync with whatever tb/ uses.
@@ -404,12 +408,13 @@ TEST(model_quant_activations_untouched) {
 }
 
 TEST(model_quant_compute_enabled_others_still_throw) {
-    // compute() accepts NOISE_QUANT now; every other enable still throws
-    // until implemented, alone or combined with quant.
+    // compute() accepts the write-time effects (quant, D2D, stuck-at); the
+    // read-time ones still throw until C2 implements them, alone or combined
+    // with quant.
     ModelExact m;
     m.set_config(quant_config(8));
     CHECK(m.compute().size() == static_cast<std::size_t>(TILE_COLS));
-    for (std::uint8_t bit : {NOISE_D2D, NOISE_READ, NOISE_STUCK, NOISE_IR, NOISE_ADC}) {
+    for (std::uint8_t bit : {NOISE_READ, NOISE_IR, NOISE_ADC}) {
         Config cfg = quant_config(8);
         cfg.noise_en = static_cast<std::uint8_t>(NOISE_QUANT | bit);
         m.set_config(cfg);

@@ -16,6 +16,9 @@ module packet_tx import fecim_pkg::*; (
     output logic tx_start,
     input logic tx_busy
 );
+    // resp_cmd reserved for response formatting; Verilator ignores *unused* names
+    logic unused_ok;
+    assign unused_ok = &{1'b0, resp_cmd};
     typedef enum logic [3:0] {
         S_IDLE, S_SYNC, S_STATUS, S_LEN_LO, S_LEN_HI,
         S_PAYLOAD_REQ, S_PAYLOAD_WAIT, S_CRC, S_WAIT_BUSY, S_WAIT_DONE

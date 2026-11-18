@@ -40,15 +40,18 @@ add_executable(model_tests
     tests/test_main.cpp
     tests/test_primitives.cpp
     tests/test_write_path.cpp
+    tests/test_write_path_d2d_stuck.cpp
     tests/test_model_ideal.cpp
     tests/test_model.cpp
     tests/test_model_exact_stub.cpp
     tests/test_mac_lane_vectors.cpp
+    tests/test_write_path_vectors.cpp
 )
 target_link_libraries(model_tests PRIVATE fecim_model)
 target_compile_options(model_tests PRIVATE ${FECIM_WARNINGS})
 # Shared golden vectors are read in place from tb/golden/, never copied into
-# the build, so a stale copy can't pass. Used by test_mac_lane_vectors.cpp.
+# the build, so a stale copy can't pass. Used by test_mac_lane_vectors.cpp
+# and test_write_path_vectors.cpp.
 target_compile_definitions(model_tests PRIVATE
     FECIM_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../tb/golden")
 
