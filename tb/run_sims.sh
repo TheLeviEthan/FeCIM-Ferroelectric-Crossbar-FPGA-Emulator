@@ -24,9 +24,10 @@ declare -A SRC=(
   [tb_packet_parser]="$PKG rtl/packet/packet_parser.sv tb/tb_packet_parser.sv"
   [tb_packet_tx]="$PKG rtl/packet/packet_tx.sv tb/tb_packet_tx.sv"
   [tb_mac_lane]="$PKG rtl/array/mac_lane.sv tb/sv/tb_mac_lane.sv"
+  [tb_control_fsm]="$PKG rtl/control/control_fsm.sv tb/tb_control_fsm.sv"
   [tb_ab_integration]="$PKG tb/integration/lane_a_stub.sv tb/integration/lane_b_stub.sv tb/integration/tb_ab_integration.sv"
 )
-ORDER=(tb_uart tb_uart_edge tb_packet_parser tb_packet_tx tb_mac_lane tb_ab_integration)
+ORDER=(tb_uart tb_uart_edge tb_packet_parser tb_packet_tx tb_mac_lane tb_control_fsm tb_ab_integration)
 [ $# -gt 0 ] && ORDER=("$@")
 
 fails=0

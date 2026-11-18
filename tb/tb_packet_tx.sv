@@ -146,6 +146,48 @@ module tb_packet_tx;
         check_byte(17, expected_crc);
         if (requests != 3) $fatal(1, "Expected 3 payload requests, got %0d", requests);
         $display("PASS: payload response and CRC");
+
+        // Additional status tests: ST_BAD_LEN, ST_UNKNOWN_CMD, ST_BUSY, ST_ADDR_RANGE
+        send_response(ST_BAD_LEN, 0);
+        wait_for_bytes(23);
+        expected_crc = crc8_byte(crc8_byte(crc8_byte(CRC_INIT, 8'h02), 8'h00), 8'h00);
+        check_byte(18, 8'h5A);
+        check_byte(19, 8'h02);
+        check_byte(20, 8'h00);
+        check_byte(21, 8'h00);
+        check_byte(22, expected_crc);
+        $display("PASS: ST_BAD_LEN response");
+
+        send_response(ST_UNKNOWN_CMD, 0);
+        wait_for_bytes(28);
+        expected_crc = crc8_byte(crc8_byte(crc8_byte(CRC_INIT, 8'h03), 8'h00), 8'h00);
+        check_byte(23, 8'h5A);
+        check_byte(24, 8'h03);
+        check_byte(25, 8'h00);
+        check_byte(26, 8'h00);
+        check_byte(27, expected_crc);
+        $display("PASS: ST_UNKNOWN_CMD response");
+
+        send_response(ST_BUSY, 0);
+        wait_for_bytes(33);
+        expected_crc = crc8_byte(crc8_byte(crc8_byte(CRC_INIT, 8'h04), 8'h00), 8'h00);
+        check_byte(28, 8'h5A);
+        check_byte(29, 8'h04);
+        check_byte(30, 8'h00);
+        check_byte(31, 8'h00);
+        check_byte(32, expected_crc);
+        $display("PASS: ST_BUSY response");
+
+        send_response(ST_ADDR_RANGE, 0);
+        wait_for_bytes(38);
+        expected_crc = crc8_byte(crc8_byte(crc8_byte(CRC_INIT, 8'h05), 8'h00), 8'h00);
+        check_byte(33, 8'h5A);
+        check_byte(34, 8'h05);
+        check_byte(35, 8'h00);
+        check_byte(36, 8'h00);
+        check_byte(37, expected_crc);
+        $display("PASS: ST_ADDR_RANGE response");
+
         $display("PASS: all packet_tx tests completed successfully");
         $finish;
     end
