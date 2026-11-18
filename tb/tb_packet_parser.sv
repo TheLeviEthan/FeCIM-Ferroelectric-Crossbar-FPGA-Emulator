@@ -132,7 +132,7 @@ module tb_packet_parser;
         if (fd != 0) begin
             vec_idx = 0;
             while (!$feof(fd) && vec_idx < 4) begin
-                status = $fscanf(fd, "%18h\n", raw_vec);
+                status = $fscanf(fd, "%h\n", raw_vec);
                 if (status == 1) begin
                     for (int b = 8; b >= 0; b--) begin
                         send_byte(raw_vec[b*8 +: 8]);
