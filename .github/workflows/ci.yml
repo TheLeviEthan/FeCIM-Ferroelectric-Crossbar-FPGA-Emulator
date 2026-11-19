@@ -85,6 +85,10 @@ jobs:
         if: ${{ !cancelled() }}
         continue-on-error: true   # non-blocking until the owner's fix lands; then delete this line
         run: verilator --lint-only -Wall --top-module packet_tx $RTL_LIBS rtl/fecim_pkg.sv rtl/packet/packet_tx.sv
+      # Lane A (Zhiting): control FSM
+      - name: Lint control_fsm (standalone)
+        if: ${{ !cancelled() }}
+        run: verilator --lint-only -Wall --top-module control_fsm $RTL_LIBS rtl/fecim_pkg.sv rtl/control/control_fsm.sv
 
 # sim - build and run every self-checking SystemVerilog testbench
 # tb/run_sims.sh is the single list of testbenches; run it locally the same way.
@@ -95,11 +99,8 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install Verilator
         run: sudo apt-get update && sudo apt-get install -y verilator
-      # tb_uart_edge is left out until it is updated for baud_gen's baud_inc
-        # port (it still passes a BAUD_INC parameter, so it does not build).
-        # Add it back to this list, or just run tb/run_sims.sh, once fixed.
       - name: Run testbenches
-        run: tb/run_sims.sh tb_uart tb_packet_parser tb_packet_tx tb_mac_lane tb_ab_integration
+        run: tb/run_sims.sh
 
 
 # model - build and run model tests

@@ -30,7 +30,10 @@ module tb_packet_parser;
     logic [15:0] rx_byte_cnt, err_cnt;
     logic err_latched;
 
-    packet_parser dut (.*);
+    localparam int TB_TIMEOUT_CYCLES = 50;
+    packet_parser #(
+        .TIMEOUT_LIMIT(TB_TIMEOUT_CYCLES)
+    ) dut (.*);
 
     int bulk_writes = 0;
     int cfg_writes = 0;
@@ -113,6 +116,61 @@ module tb_packet_parser;
         repeat (2) @(negedge clk);
     endtask
 
+    // Replays golden vectors from tb/golden/packet_vectors.bin.hex through the parser.
+    task automatic replay_golden_vectors();
+        int fd;
+        int status;
+        logic [71:0] raw_vec;
+        int vec_idx;
+
+        $display("Replaying golden vectors from tb/golden/packet_vectors.bin.hex...");
+        fd = $fopen("tb/golden/packet_vectors.bin.hex", "r");
+        if (fd == 0) begin
+            fd = $fopen("golden/packet_vectors.bin.hex", "r");
+        end
+
+        if (fd != 0) begin
+            vec_idx = 0;
+            while (!$feof(fd) && vec_idx < 4) begin
+                status = $fscanf(fd, "%h\n", raw_vec);
+                if (status == 1) begin
+                    for (int b = 8; b >= 0; b--) begin
+                        send_byte(raw_vec[b*8 +: 8]);
+                    end
+                    case (vec_idx)
+                        0: check_response(CMD_WRITE_WEIGHTS, ST_OK, 0);
+                        1: check_response(CMD_WRITE_ACT, ST_OK, 0);
+                        2: check_response(CMD_SET_CONFIG, ST_BAD_LEN, 0);
+                        3: check_response(CMD_WRITE_WEIGHTS, ST_OK, 0);
+                        default: ;
+                    endcase
+                    vec_idx++;
+                end
+            end
+            $fclose(fd);
+            $display("PASS: replayed %0d golden vectors from packet_vectors.bin.hex", vec_idx);
+        end else begin
+            logic [71:0] fallback_vecs [0:3];
+            fallback_vecs[0] = 72'ha50104000a000000e7;
+            fallback_vecs[1] = 72'ha50204001001ff00c6;
+            fallback_vecs[2] = 72'ha503040000000000c2;
+            fallback_vecs[3] = 72'ha50104000200000057;
+
+            for (int v = 0; v < 4; v++) begin
+                for (int b = 8; b >= 0; b--) begin
+                    send_byte(fallback_vecs[v][b*8 +: 8]);
+                end
+                case (v)
+                    0: check_response(CMD_WRITE_WEIGHTS, ST_OK, 0);
+                    1: check_response(CMD_WRITE_ACT, ST_OK, 0);
+                    2: check_response(CMD_SET_CONFIG, ST_BAD_LEN, 0);
+                    3: check_response(CMD_WRITE_WEIGHTS, ST_OK, 0);
+                endcase
+            end
+            $display("PASS: replayed 4 golden vectors (fallback)");
+        end
+    endtask
+
     logic [7:0] payload [0:511];
 
     initial begin
@@ -165,6 +223,59 @@ module tb_packet_parser;
         send_byte(8'h02);
         check_response(CMD_WRITE_WEIGHTS, ST_BAD_LEN, 0);
         $display("PASS: oversized payload rejected");
+
+        // Test 6: ST_UNKNOWN_CMD: unmapped command opcode
+        send_packet(8'hEE, 0, payload, 0);
+        check_response(8'hEE, ST_UNKNOWN_CMD, 0);
+        $display("PASS: unknown command rejected with ST_UNKNOWN_CMD");
+
+        // Test 7: wrong-length SET_CONFIG (payload length != 5)
+        payload[0] = 8'h02;
+        payload[1] = 8'h78;
+        payload[2] = 8'h56;
+        send_packet(CMD_SET_CONFIG, 3, payload, 0);
+        check_response(CMD_SET_CONFIG, ST_BAD_LEN, 0);
+        $display("PASS: wrong-length SET_CONFIG rejected with ST_BAD_LEN");
+
+        // Test 8: READ_RESULT out of range
+        // Case 8a: start (100) + count (50) = 150 > TILE_COLS (128)
+        payload[0] = 8'd100;
+        payload[1] = 8'd0;
+        payload[2] = 8'd50;
+        payload[3] = 8'd0;
+        send_packet(CMD_READ_RESULT, 4, payload, 0);
+        check_response(CMD_READ_RESULT, ST_ADDR_RANGE, 0);
+
+        // Case 8b: count = 0
+        payload[0] = 8'd0;
+        payload[1] = 8'd0;
+        payload[2] = 8'd0;
+        payload[3] = 8'd0;
+        send_packet(CMD_READ_RESULT, 4, payload, 0);
+        check_response(CMD_READ_RESULT, ST_ADDR_RANGE, 0);
+        $display("PASS: READ_RESULT out of range rejected with ST_ADDR_RANGE");
+
+        // Test 9: mid-frame timeout recovery
+        begin
+            logic [15:0] prev_err_cnt;
+            prev_err_cnt = err_cnt;
+            // Send partial frame (SYNC + CMD) then stall
+            send_byte(SYNC_H2F);
+            send_byte(CMD_IDENTIFY);
+            // Wait for parser timeout (TB_TIMEOUT_CYCLES + margin)
+            repeat (TB_TIMEOUT_CYCLES + 10) @(posedge clk);
+            if (err_cnt != prev_err_cnt + 16'd1 || !err_latched)
+                $fatal(1, "FAIL: timeout did not increment err_cnt: prev=%0d now=%0d", prev_err_cnt, err_cnt);
+            if (resp_valid)
+                $fatal(1, "FAIL: timeout must not produce a response packet");
+            // Confirm parser recovered back to PKT_HUNT by sending a fresh packet
+            send_packet(CMD_IDENTIFY, 0, payload, 0);
+            check_response(CMD_IDENTIFY, ST_OK, 16);
+            $display("PASS: mid-frame timeout recovery confirmed");
+        end
+
+        // Test 10: Replay golden packet vectors from packet_vectors.bin.hex
+        replay_golden_vectors();
 
         $display("PASS: all packet parser tests completed successfully");
         $finish;

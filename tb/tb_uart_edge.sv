@@ -13,8 +13,13 @@ module tb_uart_edge;
 
     always #10 clk = ~clk; // 50 MHz
 
-    baud_gen #(.BAUD_INC(16'd19327)) bg (
-        .clk(clk), .rst_n(rst_n), .tick_16x(tick_16x)
+    localparam logic [15:0] BAUD_INC = 16'd19327;
+
+    baud_gen bg (
+        .clk      (clk),
+        .rst_n    (rst_n),
+        .baud_inc (BAUD_INC),
+        .tick_16x (tick_16x)
     );
     uart_rx dut (
         .clk(clk), .rst_n(rst_n), .tick_16x(tick_16x),
