@@ -32,7 +32,7 @@ module tb_packet_parser;
 
     localparam int TB_TIMEOUT_CYCLES = 50;
     packet_parser #(
-        .TIMEOUT_CYCLES(TB_TIMEOUT_CYCLES)
+        .TIMEOUT_LIMIT(TB_TIMEOUT_CYCLES)
     ) dut (.*);
 
     int bulk_writes = 0;

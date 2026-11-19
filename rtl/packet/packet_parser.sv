@@ -3,7 +3,7 @@
 module packet_parser
     import fecim_pkg::*;
 #(
-    parameter int TIMEOUT_CYCLES = fecim_pkg::TIMEOUT_CYCLES
+    parameter int TIMEOUT_LIMIT = TIMEOUT_CYCLES
 )(
     input logic clk, rst_n,
     input logic [7:0] rx_data,
@@ -122,7 +122,7 @@ module packet_parser
             else timeout_count <= timeout_count + 32'd1;
 
             if (state != PKT_HUNT && state != PKT_RESPOND &&
-                state != PKT_DISPATCH && timeout_count >= TIMEOUT_CYCLES-1) begin
+                state != PKT_DISPATCH && timeout_count >= TIMEOUT_LIMIT-1) begin
                 state <= PKT_HUNT;
                 err_cnt <= err_cnt + 16'd1;
                 err_latched <= 1;
