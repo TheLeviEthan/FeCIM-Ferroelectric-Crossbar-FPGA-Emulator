@@ -116,7 +116,13 @@ module fecim_top
 
     // Diagnostics
     logic [15:0]           rx_byte_cnt, err_cnt;
+    logic [15:0]           crc_err_cnt, timeout_cnt, framing_err_cnt;
     logic                  err_latched;
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) framing_err_cnt <= 16'd0;
+        else if (rx_frame_err) framing_err_cnt <= framing_err_cnt + 16'd1;
+    end
 
     // Array / results (B -> A)
     logic                  lane_we;
@@ -188,6 +194,8 @@ module fecim_top
         .resp_ready    (resp_ready),
         .rx_byte_cnt   (rx_byte_cnt),
         .err_cnt       (err_cnt),
+        .crc_err_cnt   (crc_err_cnt),
+        .timeout_cnt   (timeout_cnt),
         .err_latched   (err_latched)
     );
 
@@ -258,20 +266,29 @@ module fecim_top
     );
 
     readout_ser u_readout_ser (
-        .clk           (clk),
-        .rst_n         (rst_n),
-        .rd_go         (rd_go),
-        .rd_argmax     (rd_argmax),
-        .rd_start      (rd_start),
-        .rd_count      (rd_count),
-        .result_raddr  (result_raddr),
-        .result_rdata  (result_rdata),
-        .argmax_idx    (argmax_idx),
-        .argmax_val    (argmax_val),
-        .argmax_second (argmax_second),
-        .rd_data       (pl_data),
-        .rd_valid      (pl_valid),
-        .rd_next       (pl_next)
+        .clk             (clk),
+        .rst_n           (rst_n),
+        .resp_valid      (resp_valid),
+        .resp_cmd        (resp_cmd),
+        .resp_status     (resp_status),
+        .resp_len        (resp_len),
+        .resp_ready      (resp_ready),
+        .cfg_rdata       (cfg_rdata),
+        .framing_err_cnt (framing_err_cnt),
+        .crc_err_cnt     (crc_err_cnt),
+        .timeout_cnt     (timeout_cnt),
+        .rd_go           (rd_go),
+        .rd_argmax       (rd_argmax),
+        .rd_start        (rd_start),
+        .rd_count        (rd_count),
+        .result_raddr    (result_raddr),
+        .result_rdata    (result_rdata),
+        .argmax_idx      (argmax_idx),
+        .argmax_val      (argmax_val),
+        .argmax_second   (argmax_second),
+        .rd_data         (pl_data),
+        .rd_valid        (pl_valid),
+        .rd_next         (pl_next)
     );
 
     display_driver u_display_driver (

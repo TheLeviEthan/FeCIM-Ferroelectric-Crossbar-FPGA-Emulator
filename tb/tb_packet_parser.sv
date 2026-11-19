@@ -27,7 +27,7 @@ module tb_packet_parser;
     status_e resp_status;
     logic [15:0] resp_len;
     logic resp_ready = 0;
-    logic [15:0] rx_byte_cnt, err_cnt;
+    logic [15:0] rx_byte_cnt, err_cnt, crc_err_cnt, timeout_cnt;
     logic err_latched;
 
     localparam int TB_TIMEOUT_CYCLES = 50;

@@ -89,6 +89,10 @@ jobs:
       - name: Lint control_fsm (standalone)
         if: ${{ !cancelled() }}
         run: verilator --lint-only -Wall --top-module control_fsm $RTL_LIBS rtl/fecim_pkg.sv rtl/control/control_fsm.sv
+      # Lane A (Zhiting): readout serializer
+      - name: Lint readout_ser (standalone)
+        if: ${{ !cancelled() }}
+        run: verilator --lint-only -Wall --top-module readout_ser $RTL_LIBS rtl/fecim_pkg.sv rtl/control/readout_ser.sv
 
 # sim - build and run every self-checking SystemVerilog testbench
 # tb/run_sims.sh is the single list of testbenches; run it locally the same way.
