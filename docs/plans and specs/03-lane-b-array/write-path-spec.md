@@ -250,6 +250,18 @@ Default to mode 0. The rail sign is drawn from `h_d2d` rather than `h_stuck` bec
 bit of `h_stuck` is consumed by the threshold comparison; reusing one would correlate the
 sign with how far below threshold the cell fell.
 
+**Sign convention (fixed by the model, Nov 2026):** `h_d2d[15] = 1` gives −127 and
+`h_d2d[15] = 0` gives +127, i.e. the sign of `h_d2d` read as an `int16`. `h_d2d` is computed
+for this even when `NOISE_EN.d2d` is clear. The comparison is strict: a cell whose `h_stuck`
+equals `stuck_rate[15:0]` is **not** stuck.
+
+```systemverilog
+assign w_rail = h_d2d[15] ? -8'sd127 : 8'sd127;
+assign w_out  = (noise_en.stuck && stuck_hit) ? (stuck_rate[16] ? w_rail : 8'sd0) : w_var;
+```
+
+The golden vectors in `tb/golden/write_path/` pin all of this, including a threshold case.
+
 Sweeping both modes and comparing is a good result — rail faults degrade accuracy far
 faster per fault.
 

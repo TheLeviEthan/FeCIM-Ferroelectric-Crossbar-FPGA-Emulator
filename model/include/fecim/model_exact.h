@@ -5,17 +5,16 @@
 // for the rules (integer only, same clamps, same rounding, LFSR advances on
 // accumulate only).
 //
-// STATUS (week 2):
-//   * Implemented: the transaction-level path (write_* + compute()) for the
-//     clean datapath and conductance quantization (NOISE_QUANT, write-path
-//     stage 1, arithmetic in fecim/write_path.h). compute() throws if any
-//     other non-ideality is enabled, rather than silently returning clean
-//     results that would make an L1/L2 comparison pass for the wrong reason.
-//   * Interface stub: the cycle-level co-sim interface, the result buffer
-//     and argmax, and the register-level interface below. Signatures and
-//     types are final so the Verilator harness (model-verification-design
+// STATUS:
+//   * Implemented: the transaction-level path (write_* + compute()) with
+//     all six non-idealities -- quantization, D2D and stuck-at at write time
+//     (fecim/write_path.h); read noise, IR drop and ADC at compute time
+//     (fecim/read_path.h) -- and reseed().
+//   * Interface stub (task C3): the cycle-level co-sim interface, the result
+//     buffer and argmax, and the register-level interface below. Signatures
+//     and types are final so the Verilator harness (model-verification-design
 //     §5) and Lane D's `sim` backend can be written against them now; the
-//     bodies throw std::logic_error until week 3.
+//     bodies throw std::logic_error until they land.
 //
 // Two levels, one model (design §10, open question 1): step() is the
 // cycle-accurate core the co-sim compares against per cycle; compute() is
@@ -59,14 +58,25 @@ public:
     void write_atten(int row, std::uint8_t coeff);   // Q0.8, IR drop
 
     // One COMPUTE: returns active_cols results as the result buffer holds them.
+    //
+    // NOT const and NOT repeatable: every issued row advances every lane's
+    // read-noise LFSR (all NUM_LANES lanes, every pass, whether or not
+    // NOISE_EN.read is set -- the RTL's LFSR has no enable). With read noise
+    // on, two computes on the same data differ unless reseed() runs between
+    // them. Changing noise_seed with set_config() does NOT reload the LFSRs;
+    // only construction (reset) and reseed() (CTRL[2]) do, as in the RTL.
     std::vector<std::int32_t> compute();
 
     // Stored (post write-path) weight, for tests and co-sim inspection.
     std::int8_t stored_weight(int row, int col) const;
 
+    // CTRL[2]: reload every lane LFSR with lane_seed(noise_seed, l), using
+    // the noise_seed in effect now. Implemented.
+    void reseed();
+
     // ======================================================================
-    // INTERFACE STUB (week 2). Everything below throws std::logic_error
-    // until it is implemented in week 3. Integer types only, each the
+    // INTERFACE STUB (task C3). Everything below throws std::logic_error
+    // until it is implemented. Integer types only, each the
     // narrowest standard type that holds the RTL signal, signed as in RTL.
     // ======================================================================
 
@@ -128,14 +138,12 @@ public:
     Status set_reg(std::uint8_t addr, std::uint32_t value);
     Status get_reg(std::uint8_t addr, std::uint32_t& value) const;
 
-    // CTRL[2]: reload every lane LFSR with lane_seed(noise_seed, l).
-    void reseed();
-
 private:
     Config cfg_;
     std::vector<std::int8_t>  weights_;   // TILE_ROWS * TILE_COLS, [col][row]
     std::vector<std::uint8_t> act_;       // TILE_ROWS
     std::vector<std::uint8_t> atten_;     // TILE_ROWS, Q0.8, default 0xFF
+    std::vector<std::uint32_t> lfsr_;     // NUM_LANES read-noise LFSRs; persist across computes
 };
 
 } // namespace fecim
