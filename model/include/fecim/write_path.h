@@ -9,11 +9,10 @@
 //
 //     w_ideal --> 1. quantize --> 2. d2d offset --> 3. stuck-at --> w_stored
 //
-// Stage 1 (quantization) is implemented and tested. Stages 2 and 3
-// (d2d_offset(), apply_stuck()) are declared with their final signatures
-// but are STUBS until week 3: they throw std::logic_error. Each stage is its
-// own free function so it can be unit-tested alone; ModelExact::write_weight()
-// is the only place that chains them.
+// All three stages are implemented and tested, and pinned by the golden
+// vectors in tb/golden/write_path/ that the RTL write path is tested against.
+// Each stage is its own free function so it can be unit-tested alone;
+// ModelExact::write_weight() is the only place that chains them.
 //
 // Ground rules (model-verification-design §2) for everything in this file:
 //
@@ -114,7 +113,8 @@ std::int8_t quantize_weight(std::int8_t   w_ideal,
 // weight stream uses. Not the lane-local {pass, row} address: two cells in
 // different lanes must not collide. 128 x 128 = 16384 cells fits 16 bits.
 //
-// STUB (week 3).
+// An index helper, not a datapath mirror, so a row or col outside the tile
+// throws std::out_of_range instead of wrapping onto another cell.
 std::uint16_t cell_addr(int row, int col);
 
 // ---------------------------------------------------------------------------
@@ -132,7 +132,9 @@ std::uint16_t cell_addr(int row, int col);
 // register; only [15:0] is used, and the function takes the register as-is
 // so that narrowing is visible here rather than at every call site.
 //
-// STUB (week 3): throws std::logic_error.
+// ">>>" is an arithmetic shift: it rounds toward minus infinity, so the
+// offset distribution is not quite symmetric (-255..+254 at sigma = 255).
+// The RTL's >>> does the same, which is all that matters for bit-exactness.
 std::int8_t d2d_offset(std::int8_t   w_q,
                        std::uint16_t cell_addr,
                        std::uint32_t noise_seed,
@@ -152,7 +154,12 @@ std::int8_t d2d_offset(std::int8_t   w_q,
 // consumed by the threshold compare), so it is drawn even when NOISE_EN.d2d
 // is clear. stuck_rate is the 17-bit register value, passed as uint32_t.
 //
-// STUB (week 3): throws std::logic_error.
+// Rail sign convention (write-path-spec §5.3): h_d2d[15] = 1 gives -127,
+// h_d2d[15] = 0 gives +127 -- the sign of h_d2d read as an int16.
+//
+// rate = 0 never hits. rate = 65535 hits every cell except the one whose
+// h_stuck is 0xFFFF, so "100 %" is not reachable; that is the register's
+// resolution, not a bug.
 std::int8_t apply_stuck(std::int8_t   w_var,
                         std::uint16_t cell_addr,
                         std::uint32_t noise_seed,
