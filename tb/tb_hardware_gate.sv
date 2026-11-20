@@ -41,7 +41,7 @@ module tb_hardware_gate;
     logic       tb_tx_start = 0;
     logic [7:0] tb_tx_data  = 0;
     logic       tb_tx_busy;
-    logic       tb_txd;
+    logic       tb_txd = 1'b1;
 
     uart_tx u_tb_tx (
         .clk      (clk),
@@ -67,6 +67,14 @@ module tb_hardware_gate;
         .rx_frame_err (tb_rx_frame_err)
     );
 
+    // RX Queue to prevent any dropped bytes
+    logic [7:0] rx_queue[$];
+    always @(posedge clk) begin
+        if (tb_rst_n && tb_rx_valid) begin
+            rx_queue.push_back(tb_rx_data);
+        end
+    end
+
     // Board RX is driven by testbench TX
     assign arduino_io[0] = tb_txd;
 
@@ -85,25 +93,26 @@ module tb_hardware_gate;
 
     task automatic send_byte(input logic [7:0] b);
         wait (!tb_tx_busy);
-        @(posedge clk);
-        tb_tx_data  <= b;
-        tb_tx_start <= 1'b1;
-        @(posedge clk);
-        tb_tx_start <= 1'b0;
-        wait (!tb_tx_busy);
+        @(negedge clk);
+        tb_tx_data  = b;
+        tb_tx_start = 1'b1;
+        @(negedge clk);
+        tb_tx_start = 1'b0;
+        wait (tb_tx_busy == 1'b1);
+        wait (tb_tx_busy == 1'b0);
+        repeat (5) @(posedge clk);
     endtask
 
-    task automatic recv_byte(output logic [7:0] b, input int timeout_cycles = 200000);
+    task automatic recv_byte(output logic [7:0] b, input int timeout_cycles = 500000);
         int elapsed = 0;
-        while (!tb_rx_valid) begin
+        while (rx_queue.size() == 0) begin
             @(posedge clk);
             elapsed++;
             if (elapsed > timeout_cycles) begin
                 $fatal(1, "TIMEOUT in recv_byte after %0d cycles", timeout_cycles);
             end
         end
-        b = tb_rx_data;
-        @(posedge clk);
+        b = rx_queue.pop_front();
     endtask
 
     task automatic send_packet(
@@ -240,11 +249,12 @@ module tb_hardware_gate;
         $display("=======================================================\n");
 
         // 1. Reset cycle
-        tb_rst_n <= 0;
-        key[0]   <= 0; // Assert KEY[0] reset
+        tb_rst_n = 0;
+        key[0]   = 0; // Assert KEY[0] reset
         #200;
-        key[0]   <= 1; // Deassert reset
-        tb_rst_n <= 1;
+        @(negedge clk);
+        key[0]   = 1; // Deassert reset
+        tb_rst_n = 1;
         #1000;
 
         // 2. Test IDENTIFY at default boot baud (115200)
@@ -298,7 +308,7 @@ module tb_hardware_gate;
             send_packet(CMD_SET_CONFIG, pl);
 
             // Reconnect testbench UART at 921600 baud
-            tb_baud_inc <= BAUD_INC_921600;
+            tb_baud_inc = BAUD_INC_921600;
 
             recv_response(resp_st, resp_len, resp_pl);
             if (resp_st != ST_OK || resp_len != 0) begin
