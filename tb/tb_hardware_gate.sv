@@ -70,20 +70,17 @@ module tb_hardware_gate;
 
     // Static RX FIFO to prevent dropped bytes (fully Verilator & Questa compatible)
     localparam int FIFO_DEPTH = 256;
-    logic [7:0] rx_fifo [0:FIFO_DEPTH-1];
-    int rx_wr_ptr = 0;
-    int rx_rd_ptr = 0;
-    int rx_count  = 0;
+    logic [7:0] rx_fifo [0:255];
+    logic [7:0] rx_wr_ptr = 8'd0;
+    logic [7:0] rx_rd_ptr = 8'd0;
 
+    // Single-producer: only clocked block modifies rx_wr_ptr
     always @(posedge clk) begin
         if (!tb_rst_n) begin
-            rx_wr_ptr <= 0;
-            rx_rd_ptr <= 0;
-            rx_count  <= 0;
+            rx_wr_ptr <= 8'd0;
         end else if (tb_rx_valid) begin
             rx_fifo[rx_wr_ptr] <= tb_rx_data;
-            rx_wr_ptr <= (rx_wr_ptr + 1) % FIFO_DEPTH;
-            rx_count  <= rx_count + 1;
+            rx_wr_ptr <= rx_wr_ptr + 8'd1;
         end
     end
 
@@ -124,16 +121,17 @@ module tb_hardware_gate;
     task automatic recv_byte(output logic [7:0] b, input int timeout_cycles = 500000);
         int elapsed;
         elapsed = 0;
-        while (rx_count == 0) begin
+        while (rx_wr_ptr == rx_rd_ptr) begin
             @(posedge clk);
             elapsed++;
             if (elapsed > timeout_cycles) begin
+                $display("FATAL: TIMEOUT in recv_byte after %0d cycles (wr_ptr=%0d, rd_ptr=%0d, tb_rx_valid=%b, rxd=%b)",
+                         timeout_cycles, rx_wr_ptr, rx_rd_ptr, tb_rx_valid, board_txd);
                 $fatal(1, "TIMEOUT in recv_byte after %0d cycles", timeout_cycles);
             end
         end
         b = rx_fifo[rx_rd_ptr];
-        rx_rd_ptr = (rx_rd_ptr + 1) % FIFO_DEPTH;
-        rx_count = rx_count - 1;
+        rx_rd_ptr = rx_rd_ptr + 8'd1;
     endtask
 
     task automatic send_packet(
@@ -336,11 +334,10 @@ module tb_hardware_gate;
             send_packet(CMD_SET_CONFIG, 5, pl);
 
             // Reconnect testbench UART at 921600 baud (mimicking host driver reconnect)
-            #50000;
+            #200000;
             rx_rd_ptr = rx_wr_ptr;
-            rx_count  = 0;
             tb_baud_inc = BAUD_INC_921600;
-            #10000;
+            #20000;
         end
         $display("PASS: Reconnected at 921600 baud");
 
