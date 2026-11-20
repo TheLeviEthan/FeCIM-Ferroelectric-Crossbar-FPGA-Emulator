@@ -5,6 +5,9 @@
 #   do tb/run_questa.do
 # =============================================================================
 
+# Ensure any active simulation is ended
+catch {quit -sim}
+
 # Create work library if it does not exist
 if {![file exists work]} {
     vlib work
@@ -19,25 +22,29 @@ vlog -sv -timescale "1ns/1ps" rtl/packet/packet_tx.sv tb/tb_packet_tx.sv
 
 # Run tb_packet_parser
 puts "\n=== Running tb_packet_parser ==="
-vsim work.tb_packet_parser
+vsim -voptargs=+acc work.tb_packet_parser
 run -all
+catch {quit -sim}
 
 # Run tb_packet_tx
 puts "\n=== Running tb_packet_tx ==="
-vsim work.tb_packet_tx
+vsim -voptargs=+acc work.tb_packet_tx
 run -all
+catch {quit -sim}
 
 # Compile & Run tb_control_fsm (Control FSM)
 vlog -sv -timescale "1ns/1ps" rtl/control/control_fsm.sv tb/tb_control_fsm.sv
 puts "\n=== Running tb_control_fsm ==="
-vsim work.tb_control_fsm
+vsim -voptargs=+acc work.tb_control_fsm
 run -all
+catch {quit -sim}
 
 # Compile & Run tb_ab_integration (A/B frozen seam integration)
 vlog -sv -timescale "1ns/1ps" tb/integration/lane_a_stub.sv tb/integration/lane_b_stub.sv tb/integration/tb_ab_integration.sv
 puts "\n=== Running tb_ab_integration ==="
-vsim work.tb_ab_integration
+vsim -voptargs=+acc work.tb_ab_integration
 run -all
+catch {quit -sim}
 
 # Compile & Run tb_hardware_gate (Hardware gate at 921600 baud)
 vlog -sv -timescale "1ns/1ps" \
@@ -54,5 +61,6 @@ vlog -sv -timescale "1ns/1ps" \
     rtl/fecim_top.sv quartus/fecim_board_top.sv \
     tb/tb_hardware_gate.sv
 puts "\n=== Running tb_hardware_gate ==="
-vsim work.tb_hardware_gate
+vsim -voptargs=+acc work.tb_hardware_gate
 run -all
+catch {quit -sim}
