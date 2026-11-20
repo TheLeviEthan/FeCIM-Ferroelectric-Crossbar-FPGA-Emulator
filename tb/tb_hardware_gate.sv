@@ -24,7 +24,8 @@ module tb_hardware_gate;
     logic [1:0]  key = 2'b11;
     wire  [9:0]  ledr;
     wire  [6:0]  hex0;
-    wire  [15:0] arduino_io;
+    wire  [7:0]  hex0_full;
+    wire         board_txd;
 
     // Testbench UART Driver
     logic [BAUD_ACC_W-1:0] tb_baud_inc = BAUD_INC_115200;
@@ -61,31 +62,48 @@ module tb_hardware_gate;
         .clk          (clk),
         .rst_n        (tb_rst_n),
         .tick_16x     (tb_tick_16x),
-        .rxd          (arduino_io[1]), // Driven by board ARDUINO_IO[1] (TXD)
+        .rxd          (board_txd),
         .rx_data      (tb_rx_data),
         .rx_valid     (tb_rx_valid),
         .rx_frame_err (tb_rx_frame_err)
     );
 
-    // RX Queue to prevent any dropped bytes
-    logic [7:0] rx_queue[$];
+    // Static RX FIFO to prevent dropped bytes (fully Verilator & Questa compatible)
+    localparam int FIFO_DEPTH = 256;
+    logic [7:0] rx_fifo [0:FIFO_DEPTH-1];
+    int rx_wr_ptr = 0;
+    int rx_rd_ptr = 0;
+    int rx_count  = 0;
+
     always @(posedge clk) begin
-        if (tb_rst_n && tb_rx_valid) begin
-            rx_queue.push_back(tb_rx_data);
+        if (!tb_rst_n) begin
+            rx_wr_ptr <= 0;
+            rx_rd_ptr <= 0;
+            rx_count  <= 0;
+        end else if (tb_rx_valid) begin
+            rx_fifo[rx_wr_ptr] <= tb_rx_data;
+            rx_wr_ptr <= (rx_wr_ptr + 1) % FIFO_DEPTH;
+            rx_count  <= rx_count + 1;
         end
     end
 
-    // Board RX is driven by testbench TX
-    assign arduino_io[0] = tb_txd;
-
-    // DUT: Board Top
-    fecim_board_top dut (
+    // DUT: Top-level FeCIM design
+    fecim_top dut (
         .MAX10_CLK1_50 (clk),
         .KEY           (key),
+        .SW            (10'd0),
         .LEDR          (ledr),
-        .HEX0          (hex0),
-        .ARDUINO_IO    (arduino_io)
+        .HEX0          (hex0_full),
+        .HEX1          (),
+        .HEX2          (),
+        .HEX3          (),
+        .HEX4          (),
+        .HEX5          (),
+        .ARDUINO_IO0   (tb_txd),
+        .ARDUINO_IO1   (board_txd)
     );
+
+    assign hex0 = hex0_full[6:0];
 
     //-------------------------------------------------------------------------
     // Testbench Helper Tasks
@@ -104,48 +122,49 @@ module tb_hardware_gate;
     endtask
 
     task automatic recv_byte(output logic [7:0] b, input int timeout_cycles = 500000);
-        int elapsed = 0;
-        while (rx_queue.size() == 0) begin
+        int elapsed;
+        elapsed = 0;
+        while (rx_count == 0) begin
             @(posedge clk);
             elapsed++;
             if (elapsed > timeout_cycles) begin
                 $fatal(1, "TIMEOUT in recv_byte after %0d cycles", timeout_cycles);
             end
         end
-        b = rx_queue.pop_front();
+        b = rx_fifo[rx_rd_ptr];
+        rx_rd_ptr = (rx_rd_ptr + 1) % FIFO_DEPTH;
+        rx_count = rx_count - 1;
     endtask
 
     task automatic send_packet(
-        input logic [7:0] cmd,
-        input logic [7:0] payload[],
-        input bit         corrupt_crc = 0
+        input logic [7:0]    cmd,
+        input int unsigned   n,
+        input logic [7:0]    payload [0:63],
+        input bit            corrupt_crc = 0
     );
         logic [7:0] crc;
-        logic [15:0] len;
-        len = 16'(payload.size());
-
         crc = crc8_byte(CRC_INIT, cmd);
-        crc = crc8_byte(crc, len[7:0]);
-        crc = crc8_byte(crc, len[15:8]);
-        for (int i = 0; i < payload.size(); i++) begin
+        crc = crc8_byte(crc, 8'(n));
+        crc = crc8_byte(crc, 8'(n >> 8));
+        for (int i = 0; i < n; i++) begin
             crc = crc8_byte(crc, payload[i]);
         end
         if (corrupt_crc) crc = ~crc;
 
         send_byte(SYNC_H2F);
         send_byte(cmd);
-        send_byte(len[7:0]);
-        send_byte(len[15:8]);
-        for (int i = 0; i < payload.size(); i++) begin
+        send_byte(8'(n));
+        send_byte(8'(n >> 8));
+        for (int i = 0; i < n; i++) begin
             send_byte(payload[i]);
         end
         send_byte(crc);
     endtask
 
     task automatic recv_response(
-        output status_e    status,
+        output status_e     status,
         output logic [15:0] len,
-        output logic [7:0]  payload[]
+        output logic [7:0]  payload [0:63]
     );
         logic [7:0] sync_byte, st_byte, len0, len1, crc_rx, crc_calc;
 
@@ -162,9 +181,13 @@ module tb_hardware_gate;
         recv_byte(len1);
         len = {len1, len0};
 
-        payload = new[len];
+        for (int i = 0; i < 64; i++) payload[i] = 8'd0;
         for (int i = 0; i < len; i++) begin
-            recv_byte(payload[i]);
+            if (i < 64) recv_byte(payload[i]);
+            else begin
+                logic [7:0] dummy;
+                recv_byte(dummy);
+            end
         end
 
         recv_byte(crc_rx);
@@ -174,7 +197,7 @@ module tb_hardware_gate;
         crc_calc = crc8_byte(crc_calc, len0);
         crc_calc = crc8_byte(crc_calc, len1);
         for (int i = 0; i < len; i++) begin
-            crc_calc = crc8_byte(crc_calc, payload[i]);
+            if (i < 64) crc_calc = crc8_byte(crc_calc, payload[i]);
         end
 
         if (crc_rx != crc_calc) begin
@@ -183,18 +206,19 @@ module tb_hardware_gate;
     endtask
 
     task automatic set_config(input logic [7:0] reg_addr, input logic [31:0] val);
-        logic [7:0] pl[5];
+        logic [7:0] pl [0:63];
         status_e resp_st;
         logic [15:0] resp_len;
-        logic [7:0] resp_pl[];
+        logic [7:0] resp_pl [0:63];
 
+        for (int i = 0; i < 64; i++) pl[i] = 8'd0;
         pl[0] = reg_addr;
         pl[1] = val[7:0];
         pl[2] = val[15:8];
         pl[3] = val[23:16];
         pl[4] = val[31:24];
 
-        send_packet(CMD_SET_CONFIG, pl);
+        send_packet(CMD_SET_CONFIG, 5, pl);
         recv_response(resp_st, resp_len, resp_pl);
 
         if (resp_st != ST_OK || resp_len != 0) begin
@@ -203,13 +227,14 @@ module tb_hardware_gate;
     endtask
 
     task automatic get_config(input logic [7:0] reg_addr, output logic [31:0] val);
-        logic [7:0] pl[1];
+        logic [7:0] pl [0:63];
         status_e resp_st;
         logic [15:0] resp_len;
-        logic [7:0] resp_pl[];
+        logic [7:0] resp_pl [0:63];
 
+        for (int i = 0; i < 64; i++) pl[i] = 8'd0;
         pl[0] = reg_addr;
-        send_packet(CMD_GET_CONFIG, pl);
+        send_packet(CMD_GET_CONFIG, 1, pl);
         recv_response(resp_st, resp_len, resp_pl);
 
         if (resp_st != ST_OK || resp_len != 4) begin
@@ -235,14 +260,16 @@ module tb_hardware_gate;
     //-------------------------------------------------------------------------
 
     initial begin
-        logic [7:0] empty_pl[];
+        logic [7:0] empty_pl [0:63];
         status_e resp_st;
         logic [15:0] resp_len;
-        logic [7:0] resp_pl[];
+        logic [7:0] resp_pl [0:63];
         logic [31:0] read_val;
         logic [15:0] magic, num_lanes, tile_rows, tile_cols;
         logic [15:0] framing_errs, crc_errs, timeout_cnt;
         logic [7:0]  proto_ver, build_id;
+
+        for (int i = 0; i < 64; i++) empty_pl[i] = 8'd0;
 
         $display("\n=======================================================");
         $display("  FeCIM Hardware Gate Integration Test (Task A2)");
@@ -259,7 +286,7 @@ module tb_hardware_gate;
 
         // 2. Test IDENTIFY at default boot baud (115200)
         $display("[Step 1] Sending IDENTIFY at boot rate 115200 baud...");
-        send_packet(CMD_IDENTIFY, empty_pl);
+        send_packet(CMD_IDENTIFY, 0, empty_pl);
         recv_response(resp_st, resp_len, resp_pl);
 
         if (resp_st != ST_OK || resp_len != 16) begin
@@ -299,17 +326,19 @@ module tb_hardware_gate;
         // 3. Switch baud rate to 921600 (BAUD_INC = 19327)
         $display("\n[Step 2] Sending SET_CONFIG for REG_BAUD_INC (19327) at 115200...");
         begin
-            logic [7:0] pl[5];
+            logic [7:0] pl [0:63];
+            for (int i = 0; i < 64; i++) pl[i] = 8'd0;
             pl[0] = REG_BAUD_INC;
             pl[1] = 8'h7F;
             pl[2] = 8'h4B;
             pl[3] = 8'h00;
             pl[4] = 8'h00;
-            send_packet(CMD_SET_CONFIG, pl);
+            send_packet(CMD_SET_CONFIG, 5, pl);
 
             // Reconnect testbench UART at 921600 baud (mimicking host driver reconnect)
             #50000;
-            rx_queue.delete();
+            rx_rd_ptr = rx_wr_ptr;
+            rx_count  = 0;
             tb_baud_inc = BAUD_INC_921600;
             #10000;
         end
@@ -326,19 +355,19 @@ module tb_hardware_gate;
         // 5. SET_CONFIG -> GET_CONFIG round-trip on all RW registers at 921600 baud
         $display("\n[Step 4] Sweeping SET_CONFIG -> GET_CONFIG round-trip on all RW registers...");
         test_rw_register(REG_TILE_CFG,      32'h00300030, "REG_TILE_CFG");
-        test_rw_register(REG_QUANT_LEVELS, 32'd64,       "REG_QUANT_LEVELS");
-        test_rw_register(REG_D2D_SIGMA,    32'd15,       "REG_D2D_SIGMA");
-        test_rw_register(REG_READ_SIGMA,   32'd25,       "REG_READ_SIGMA");
-        test_rw_register(REG_NOISE_SEED,   32'hA5A55A5A, "REG_NOISE_SEED");
-        test_rw_register(REG_NOISE_EN,     32'h0000001F, "REG_NOISE_EN");
-        test_rw_register(REG_ADC_BITS,     32'd8,        "REG_ADC_BITS");
-        test_rw_register(REG_STUCK_RATE,   32'h0001ABCD, "REG_STUCK_RATE");
-        test_rw_register(REG_QUANT_MULT,   32'd1024,     "REG_QUANT_MULT");
+        test_rw_register(REG_QUANT_LEVELS,  32'd64,       "REG_QUANT_LEVELS");
+        test_rw_register(REG_D2D_SIGMA,     32'd15,       "REG_D2D_SIGMA");
+        test_rw_register(REG_READ_SIGMA,    32'd25,       "REG_READ_SIGMA");
+        test_rw_register(REG_NOISE_SEED,    32'hA5A55A5A, "REG_NOISE_SEED");
+        test_rw_register(REG_NOISE_EN,      32'h0000001F, "REG_NOISE_EN");
+        test_rw_register(REG_ADC_BITS,      32'd8,        "REG_ADC_BITS");
+        test_rw_register(REG_STUCK_RATE,    32'h0001ABCD, "REG_STUCK_RATE");
+        test_rw_register(REG_QUANT_MULT,    32'd1024,     "REG_QUANT_MULT");
         $display("PASS: all RW registers confirmed round-trip at 921600 baud");
 
         // 6. Bad CRC test
         $display("\n[Step 5] Sending frame with corrupted CRC at 921600 baud...");
-        send_packet(CMD_IDENTIFY, empty_pl, 1); // corrupt CRC
+        send_packet(CMD_IDENTIFY, 0, empty_pl, 1); // corrupt CRC
         recv_response(resp_st, resp_len, resp_pl);
         if (resp_st !== ST_CRC_ERR || resp_len !== 0) begin
             $fatal(1, "Bad CRC expected ST_CRC_ERR (0x01) with len 0, got st=0x%02h, len=%0d",
@@ -348,7 +377,7 @@ module tb_hardware_gate;
 
         // 7. Verify IDENTIFY error counter tracks the CRC error
         $display("\n[Step 6] Verifying IDENTIFY reflects incremented CRC error counter...");
-        send_packet(CMD_IDENTIFY, empty_pl);
+        send_packet(CMD_IDENTIFY, 0, empty_pl);
         recv_response(resp_st, resp_len, resp_pl);
         if (resp_st !== ST_OK || resp_len !== 16) begin
             $fatal(1, "Post-error IDENTIFY failed: st=0x%02h, len=%0d", resp_st, resp_len);

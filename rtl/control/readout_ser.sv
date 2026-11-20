@@ -159,7 +159,7 @@ module readout_ser
             case (state)
                 RO_BUFFERED: begin
                     if (rd_next) begin
-                        rd_data  <= buf_data[buf_idx];
+                        rd_data  <= buf_data[buf_idx[3:0]];
                         rd_valid <= 1'b1;
                         buf_idx  <= buf_idx + 5'd1;
                         if (buf_idx + 5'd1 == buf_len) begin
@@ -179,7 +179,7 @@ module readout_ser
                                 rd_data    <= result_rdata[31:24];
                                 cur_col    <= cur_col + 1'b1;
                                 words_left <= words_left - 1'b1;
-                                if (words_left == 1'b1) begin
+                                if (words_left == 8'd1) begin
                                     state <= RO_IDLE;
                                 end
                             end

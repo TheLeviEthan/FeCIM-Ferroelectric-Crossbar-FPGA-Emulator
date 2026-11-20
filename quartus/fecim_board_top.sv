@@ -30,7 +30,6 @@ module fecim_board_top
 
     // ARDUINO_IO[0] is UART RX (input from host / USB-UART dongle)
     assign uart_rxd         = ARDUINO_IO[0];
-    assign ARDUINO_IO[0]    = 1'bz;
 
     // ARDUINO_IO[1] is UART TX (output to host / USB-UART dongle)
     assign ARDUINO_IO[1]    = uart_txd;
