@@ -47,7 +47,7 @@ for tb in "${ORDER[@]}"; do
     printf '%-20s PASS  %s\n' "$tb" "$(grep PASS "$log" | tail -1 | sed 's/^ *//')"
   else
     printf '%-20s FAIL  (exit %d, log %s)\n' "$tb" "$rc" "$log"
-    grep -E 'FAIL|%Error|Error' "$log" | head -5 | sed 's/^/    /'
+    tail -n 30 "$log" | sed 's/^/    /'
     fails=$((fails+1))
   fi
 done

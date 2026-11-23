@@ -107,14 +107,14 @@ module tb_hardware_gate;
     //-------------------------------------------------------------------------
 
     task automatic send_byte(input logic [7:0] b);
-        wait (!tb_tx_busy);
+        while (tb_tx_busy) @(posedge clk);
         @(negedge clk);
         tb_tx_data  = b;
         tb_tx_start = 1'b1;
         @(negedge clk);
         tb_tx_start = 1'b0;
-        wait (tb_tx_busy == 1'b1);
-        wait (tb_tx_busy == 1'b0);
+        while (!tb_tx_busy) @(posedge clk);
+        while (tb_tx_busy)  @(posedge clk);
         repeat (5) @(posedge clk);
     endtask
 
@@ -125,7 +125,7 @@ module tb_hardware_gate;
             @(posedge clk);
             elapsed++;
             if (elapsed > timeout_cycles) begin
-                $display("FATAL: TIMEOUT in recv_byte after %0d cycles (wr_ptr=%0d, rd_ptr=%0d, tb_rx_valid=%b, rxd=%b)",
+                $display("FAIL: TIMEOUT in recv_byte after %0d cycles (wr_ptr=%0d, rd_ptr=%0d, tb_rx_valid=%b, rxd=%b)",
                          timeout_cycles, rx_wr_ptr, rx_rd_ptr, tb_rx_valid, board_txd);
                 $fatal(1, "TIMEOUT in recv_byte after %0d cycles", timeout_cycles);
             end
