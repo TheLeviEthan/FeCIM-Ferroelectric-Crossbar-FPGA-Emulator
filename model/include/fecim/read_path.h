@@ -8,9 +8,9 @@
 //   each mac_lane     --> read_noise_q() added to the stored weight
 //   drain-chain output --> adc_quantize() --> result buffer / argmax
 //
-// STATUS (week 2): INTERFACE STUB. Signatures and types are final so the
-// co-sim harness and ModelExact::step() can be written against them; every
-// body throws std::logic_error until the week-3 non-ideality work fills it.
+// All three are implemented and tested, and pinned by the golden vectors in
+// tb/golden/read_noise/, tb/golden/ir_drop/ and tb/golden/adc/ that the RTL
+// is tested against. ModelExact::compute() applies them in the RTL's order.
 //
 // Same ground rules as write_path.h (model-verification-design §2):
 // integer only, argument types = register widths, no input validation in
@@ -36,7 +36,14 @@ namespace fecim {
 // Pure function of the state. WHEN the LFSR advances (on acc_en only, never
 // free-running) is ModelExact's job, via fecim::lfsr_step().
 //
-// STUB (week 3): throws std::logic_error.
+// Alignment (mac-array-spec §5.5, agreed with Lane B): the LFSR steps on the
+// clock edge that ends the cycle a row is issued in, and that row's sample
+// is computed from the NEW state in the next cycle. So the row's noise is
+// read_noise_q(lfsr_step(state_before_the_row)), and the first row after a
+// reset or reseed uses lfsr_step(lane_seed(...)), never the seed itself.
+//
+// Range: with an 8-bit sigma, scaled is -128..+127, so the clamp only ever
+// turns -128 into -127 (ih_sum <= 1 at sigma 255).
 std::int8_t read_noise_q(std::uint32_t lfsr, std::uint8_t read_sigma);
 
 // ---------------------------------------------------------------------------
@@ -48,7 +55,11 @@ std::int8_t read_noise_q(std::uint32_t lfsr, std::uint8_t read_sigma);
 // one multiplier instead of sixty-four. Reset coefficient 0xFF (0.996) is
 // NOT the identity; the identity is NOISE_EN.ir = 0.
 //
-// STUB (week 3): throws std::logic_error.
+// "Algebraically identical" holds before rounding. With the >> 8 it is not
+// bit-identical to attenuating each product: (w * ((a * k) >> 8)) and
+// ((w * a * k) >> 8) differ in the low bits. The model and the RTL both
+// attenuate the activation, so they agree with each other; the report must
+// describe the approximation in those terms.
 std::uint8_t ir_attenuate(std::uint8_t act, std::uint8_t coeff);
 
 // ---------------------------------------------------------------------------
@@ -61,10 +72,12 @@ std::uint8_t ir_attenuate(std::uint8_t act, std::uint8_t coeff);
 //   out = sh == 0 ? acc : ((acc + (1 << (sh-1))) >>> sh) << sh
 //
 // (x + half) >> sh, not round(x / 2^sh): they differ on negative halves.
-// adc_bits >= ACC_USED_W must be an exact no-op. adc_bits is the 5-bit
-// register value.
+// adc_bits >= ACC_USED_W must be an exact no-op. Only adc_bits[4:0] is
+// used, because that is the RTL port's width: ADC_BITS = 32 arrives as 0 and
+// quantizes to one bit. The driver keeps the register in 4..ACC_USED_W.
 //
-// STUB (week 3): throws std::logic_error.
+// Arithmetic is 32-bit and wraps exactly as the RTL's adder does; inside
+// the accumulator's used range (+/-8,290,560) nothing wraps.
 std::int32_t adc_quantize(std::int32_t acc, std::uint8_t adc_bits);
 
 } // namespace fecim

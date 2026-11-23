@@ -96,11 +96,31 @@ TEST(identity_one_hot) {
 }
 
 TEST(nonidealities_not_silently_ignored) {
+    // Every enable now has an implementation. The original intent of this
+    // test still holds: a non-ideality that is switched on with a non-zero
+    // strength must change the result. Each read-time bit, alone, against
+    // the clean result on the same data (LFSRs reseeded before each run).
     ModelExact m;
+    for (int r = 0; r < TILE_ROWS; ++r) {
+        m.write_activation(r, static_cast<std::uint8_t>(37 + r));
+        for (int c = 0; c < TILE_COLS; ++c)
+            m.write_weight(r, c, static_cast<std::int8_t>((r * 7 + c * 13) % 200 - 100));
+    }
+    for (int r = 0; r < TILE_ROWS; ++r)
+        m.write_atten(r, static_cast<std::uint8_t>(255 - r));
     Config cfg;
-    cfg.noise_en = NOISE_READ;
     m.set_config(cfg);
-    CHECK_THROWS(m.compute(), std::logic_error);
+    m.reseed();
+    const auto clean = m.compute();
+    for (std::uint8_t bit : {NOISE_READ, NOISE_IR, NOISE_ADC}) {
+        Config c2;
+        c2.noise_en   = bit;
+        c2.read_sigma = 128;
+        c2.adc_bits   = 8;
+        m.set_config(c2);
+        m.reseed();
+        CHECK(m.compute() != clean);
+    }
 }
 
 TEST(bounds_checked) {

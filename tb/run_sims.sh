@@ -11,8 +11,18 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
-OUT="${SIM_OUT:-build/sim}"
+# Verilator refuses to build in a directory whose path contains a space
+# (verilated.mk). Sources are passed relative to the repo root, so only the
+# build directory has to avoid spaces: use build/sim normally, or a temp dir
+# when the checkout path has a space (e.g. "~/FeCIM Local/...").
+if [ -n "${SIM_OUT:-}" ]; then OUT="$SIM_OUT"
+elif [[ "$PWD" == *" "* ]]; then OUT="${TMPDIR:-/tmp}/fecim-sim-${USER:-build}"
+else OUT="build/sim"; fi
 mkdir -p "$OUT"
+if ! verilator --version 2>/dev/null | grep -qE "Verilator (5|[6-9])\."; then
+  echo "tb/run_sims.sh needs Verilator >= 5 (for --binary/--timing); found: $(verilator --version 2>/dev/null || echo none)"
+  exit 2
+fi
 
 PKG=rtl/fecim_pkg.sv
 UART="rtl/uart/baud_gen.sv rtl/uart/uart_rx.sv rtl/uart/uart_tx.sv"

@@ -21,6 +21,10 @@
 //                        6348 (2023), and Duan et al., IEDM 2024 (survey
 //                        §2.4, Levels table). Set B candidate.
 //
+// Stages 2 and 3 (D2D variation, stuck-at faults) are tested in
+// test_write_path_d2d_stuck.cpp, and every stage is replayed against the
+// shared golden vectors in test_write_path_vectors.cpp.
+//
 // These mirror write-path-spec §9 tests 3, 4, 5 and 12, so the RTL
 // testbench can pin the SAME vectors. The golden table is the shared
 // contract; keep it in sync with whatever tb/ uses.
@@ -403,17 +407,16 @@ TEST(model_quant_activations_untouched) {
         CHECK_EQ(y[static_cast<std::size_t>(c)], std::int32_t{c});
 }
 
-TEST(model_quant_compute_enabled_others_still_throw) {
-    // compute() accepts NOISE_QUANT now; every other enable still throws
-    // until implemented, alone or combined with quant.
+TEST(model_quant_compute_accepts_every_enable_combination) {
+    // compute() implements all six non-idealities, so every NOISE_EN value
+    // runs, alone or combined with quant, and returns active_cols results.
+    // (Behaviour of the read-time effects: test_read_path.cpp.)
     ModelExact m;
-    m.set_config(quant_config(8));
-    CHECK(m.compute().size() == static_cast<std::size_t>(TILE_COLS));
-    for (std::uint8_t bit : {NOISE_D2D, NOISE_READ, NOISE_STUCK, NOISE_IR, NOISE_ADC}) {
+    for (unsigned en = 0; en < 64u; ++en) {
         Config cfg = quant_config(8);
-        cfg.noise_en = static_cast<std::uint8_t>(NOISE_QUANT | bit);
+        cfg.noise_en = static_cast<std::uint8_t>(en);
         m.set_config(cfg);
-        CHECK_THROWS(m.compute(), std::logic_error);
+        CHECK(m.compute().size() == static_cast<std::size_t>(TILE_COLS));
     }
 }
 
