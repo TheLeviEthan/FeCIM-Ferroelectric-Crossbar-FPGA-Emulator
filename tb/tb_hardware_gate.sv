@@ -104,8 +104,8 @@ module tb_hardware_gate;
 
     always @(posedge clk) begin
         if (u_tb_tx.tx_start) begin
-            $display("[DEBUG-TB-TX]  tx_start byte=0x%02h | dut.rst_n=%b dut.tick=%b rxd=%b rx_st=%0d baud_inc=%0d",
-                     u_tb_tx.tx_data, dut.rst_n, dut.tick_16x, dut.ARDUINO_IO0, dut.u_uart_rx.state, dut.baud_inc);
+            $display("[DEBUG-TB-TX]  tx_start byte=0x%02h | dut.rst_n=%b dut.KEY=%b dut.tick=%b rxd=%b rx_st=%0d baud_inc=%0d",
+                     u_tb_tx.tx_data, dut.rst_n, dut.KEY, dut.tick_16x, dut.ARDUINO_IO0, dut.u_uart_rx.state, dut.baud_inc);
         end
         if (dut.u_uart_rx.rx_valid)          $display("[DEBUG-DUT-RX] rx_valid byte=0x%02h", dut.u_uart_rx.rx_data);
         if (dut.u_packet_parser.resp_valid)  $display("[DEBUG-PARSER] resp_valid cmd=0x%02h st=0x%02h", dut.u_packet_parser.resp_cmd, dut.u_packet_parser.resp_status);
@@ -286,11 +286,13 @@ module tb_hardware_gate;
 
         // 1. Reset cycle: initialize line to idle-high before releasing DUT reset
         tb_rst_n = 0;
-        key[0]   = 0; // Assert KEY[0] reset
+        key      = 2'b10; // Assert KEY[0] reset as whole word
         repeat (20) @(posedge clk);
-        tb_rst_n = 1; // Release TB transmitter so tb_txd is driven firmly to 1'b1 (UART idle)
+        @(negedge clk);
+        tb_rst_n = 1;     // Release TB transmitter so tb_txd is driven firmly to 1'b1 (UART idle)
         repeat (100) @(posedge clk);
-        key[0]   = 1; // Deassert DUT reset into clean idle-high line
+        @(negedge clk);
+        key      = 2'b11; // Deassert DUT reset into clean idle-high line at negedge clk
         repeat (100) @(posedge clk); // Allow reset_sync and all accumulators to settle
         rx_rd_ptr = 8'd0;
 
