@@ -113,8 +113,8 @@ module tb_hardware_gate;
         tb_tx_start = 1'b1;
         @(negedge clk);
         tb_tx_start = 1'b0;
-        wait (tb_tx_busy == 1'b1);
-        wait (tb_tx_busy == 1'b0);
+        @(posedge clk);
+        while (tb_tx_busy) @(posedge clk);
         repeat (50) @(posedge clk);
     endtask
 
@@ -273,14 +273,15 @@ module tb_hardware_gate;
         $display("  FeCIM Hardware Gate Integration Test (Task A2)");
         $display("=======================================================\n");
 
-        // 1. Reset cycle
+        // 1. Reset cycle: initialize line to idle-high before releasing DUT reset
         tb_rst_n = 0;
         key[0]   = 0; // Assert KEY[0] reset
-        #200;
-        @(negedge clk);
-        key[0]   = 1; // Deassert reset
-        tb_rst_n = 1;
-        #1000;
+        repeat (20) @(posedge clk);
+        tb_rst_n = 1; // Release TB transmitter so tb_txd is driven firmly to 1'b1 (UART idle)
+        repeat (100) @(posedge clk);
+        key[0]   = 1; // Deassert DUT reset into clean idle-high line
+        repeat (100) @(posedge clk); // Allow reset_sync and all accumulators to settle
+        rx_rd_ptr = 8'd0;
 
         // 2. Test IDENTIFY at default boot baud (115200)
         $display("[Step 1] Sending IDENTIFY at boot rate 115200 baud...");
