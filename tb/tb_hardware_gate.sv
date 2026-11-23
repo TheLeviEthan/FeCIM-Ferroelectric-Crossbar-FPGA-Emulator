@@ -102,6 +102,14 @@ module tb_hardware_gate;
 
     assign hex0 = hex0_full[6:0];
 
+    always @(posedge clk) begin
+        if (u_tb_tx.tx_start)                $display("[DEBUG-TB-TX]  tx_start byte=0x%02h", u_tb_tx.tx_data);
+        if (dut.u_uart_rx.rx_valid)          $display("[DEBUG-DUT-RX] rx_valid byte=0x%02h", dut.u_uart_rx.rx_data);
+        if (dut.u_packet_parser.resp_valid)  $display("[DEBUG-PARSER] resp_valid cmd=0x%02h st=0x%02h", dut.u_packet_parser.resp_cmd, dut.u_packet_parser.resp_status);
+        if (dut.u_uart_tx.tx_start)          $display("[DEBUG-DUT-TX] tx_start byte=0x%02h", dut.u_uart_tx.tx_data);
+        if (u_tb_rx.rx_valid)                $display("[DEBUG-TB-RX]  rx_valid byte=0x%02h", u_tb_rx.rx_data);
+    end
+
     //-------------------------------------------------------------------------
     // Testbench Helper Tasks
     //-------------------------------------------------------------------------
