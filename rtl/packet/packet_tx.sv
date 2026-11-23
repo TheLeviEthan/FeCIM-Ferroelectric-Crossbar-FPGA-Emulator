@@ -1,7 +1,9 @@
 // Lane A response packet transmitter.
 // Wire format: [5A][STATUS][LEN_LO][LEN_HI][PAYLOAD...][CRC8]
 // CRC covers STATUS, LEN_LO, LEN_HI, and PAYLOAD (not sync).
-module packet_tx import fecim_pkg::*; (
+module packet_tx
+    import fecim_pkg::*;
+(
     input logic clk,
     input logic rst_n,
     input logic resp_valid,

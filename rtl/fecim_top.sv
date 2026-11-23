@@ -25,8 +25,10 @@ module fecim_top
 
     assign clk = MAX10_CLK1_50;
 
+    // synthesis translate_off
     // Elaboration-time parameter checks (no hardware).
     fecim_pkg_checks u_pkg_checks ();
+    // synthesis translate_on
 
     //-------------------------------------------------------------------------
     // Reset and slow asynchronous inputs

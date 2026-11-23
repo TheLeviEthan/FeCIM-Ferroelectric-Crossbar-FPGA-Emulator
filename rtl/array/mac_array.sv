@@ -52,23 +52,26 @@ module mac_array
     //-------------------------------------------------------------------------
     logic [ACC_W-1:0] lane_acc [NUM_LANES+1];
 
-    for (genvar l = 0; l < NUM_LANES; l++) begin : g_lane
-        mac_lane #(.LANE_ID(l)) u_lane (
-            .clk        (clk),
-            .rst_n      (rst_n),
-            .wt_we      (lane_we),
-            .wt_addr    (wt_addr),
-            .wt_data    ($signed(lane_wdata)),
-            .w_addr     (seq_cnt),
-            .act_bcast  (act_bcast),
-            .noise_en   (noise_en),
-            .acc_clear  (acc_clear),
-            .acc_en     (acc_en),
-            .shift_en   (shift_en),
-            .shift_in   (lane_acc[l+1]),
-            .acc_out    (lane_acc[l])
-        );
-    end
+    genvar l;
+    generate
+        for (l = 0; l < NUM_LANES; l++) begin : g_lane
+            mac_lane #(.LANE_ID(l)) u_lane (
+                .clk        (clk),
+                .rst_n      (rst_n),
+                .wt_we      (lane_we),
+                .wt_addr    (wt_addr),
+                .wt_data    ($signed(lane_wdata)),
+                .w_addr     (seq_cnt),
+                .act_bcast  (act_bcast),
+                .noise_en   (noise_en),
+                .acc_clear  (acc_clear),
+                .acc_en     (acc_en),
+                .shift_en   (shift_en),
+                .shift_in   (lane_acc[l+1]),
+                .acc_out    (lane_acc[l])
+            );
+        end
+    endgenerate
 
     assign lane_acc[NUM_LANES] = '0;
     assign chain_out           = lane_acc[0];
