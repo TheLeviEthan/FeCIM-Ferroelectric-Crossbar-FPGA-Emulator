@@ -193,7 +193,10 @@ TEST(mvm_vectors_through_model_exact) {
     CHECK_EQ(cs.size(), 1 + n * 12);
     CHECK_EQ(d.size(), 1 + std::size_t{d[0]});
 
-    ModelExact m;                                   // ONE model, reset once
+    // Two models, each reset once and never between cases: m runs the fast
+    // compute() path, ms the cycle-level path (start_compute, step until
+    // idle). Both must reproduce every vector.
+    ModelExact m, ms;
     for (std::size_t i = 0; i < n; ++i) {
         const std::uint32_t* f = &cs[1 + i * 12];
         Config cfg;
@@ -209,17 +212,25 @@ TEST(mvm_vectors_through_model_exact) {
         cfg.stuck_rate   = f[9];
         const std::uint32_t flags = f[10];
         std::size_t pos = 1 + f[11];
-        m.set_config(cfg);
-        if (flags & 2u)
-            for (int c = 0; c < cfg.active_cols; ++c)
-                for (int r = 0; r < cfg.active_rows; ++r)
-                    m.write_weight(r, c, static_cast<std::int8_t>(i8(d[pos++])));
-        if (flags & 4u)
-            for (int r = 0; r < cfg.active_rows; ++r) m.write_activation(r, u8(d[pos++]));
-        if (flags & 8u)
-            for (int r = 0; r < TILE_ROWS; ++r) m.write_atten(r, u8(d[pos++]));
-        if (flags & 1u) m.reseed();
+        for (ModelExact* mm : {&m, &ms}) {
+            std::size_t q = pos;
+            mm->set_config(cfg);
+            if (flags & 2u)
+                for (int c = 0; c < cfg.active_cols; ++c)
+                    for (int r = 0; r < cfg.active_rows; ++r)
+                        mm->write_weight(r, c, static_cast<std::int8_t>(i8(d[q++])));
+            if (flags & 4u)
+                for (int r = 0; r < cfg.active_rows; ++r) mm->write_activation(r, u8(d[q++]));
+            if (flags & 8u)
+                for (int r = 0; r < TILE_ROWS; ++r) mm->write_atten(r, u8(d[q++]));
+            if (flags & 1u) mm->reseed();
+            if (mm == &ms) pos = q;
+        }
         const auto y = m.compute();
+        ms.start_compute();
+        int guard = 0;
+        do { ms.step(); } while (ms.state() != CTRL_IDLE && ++guard < 1000);
+        CHECK(ms.results() == y);
         CHECK_EQ(y.size(), static_cast<std::size_t>(cfg.active_cols));
         int bad = 0;
         for (std::size_t c = 0; c < y.size(); ++c)

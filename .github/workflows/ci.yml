@@ -138,16 +138,23 @@ jobs:
         # The skip gate is gone: a missing harness is now a real failure.
       - name: Install Verilator
         run: sudo apt-get update && sudo apt-get install -y verilator
-      - name: Build co-simulation harness
+      - name: Build co-simulation harnesses
         run: make -C model/cosim
-      - name: Run L0 bit-exact gate (lane 5)
+      # Full-array L0 gate (C4): Verilated mac_array vs ModelExact::step(),
+        # every lane every cycle, plus rtl == model_exact == model_ideal.
+        # Short run here; the full gate is `run_l0_array 1 1000` (~12 s).
+      - name: Run full-array L0 gate (128x128, and 48 rows x 100 cols)
+        run: |
+          ./model/cosim/run_l0_array 1 50
+          ./model/cosim/run_l0_array 2 50 48 100
+      - name: Run single-lane L0 gate (lane 5)
         run: ./model/cosim/run_l0 1 500
       # lanes 0 and 63 are the decode edge cases (lowest/highest LANE_ID)
-      - name: Run L0 gate on edge lanes (0, 63)
+      - name: Run single-lane L0 gate on edge lanes (0, 63)
         run: |
           for l in 0 63; do
-            make -C model/cosim clean
-            make -C model/cosim LANE_ID=$l
+            rm -rf model/cosim/obj_dir model/cosim/run_l0
+            make -C model/cosim run_l0 LANE_ID=$l
             ./model/cosim/run_l0 2 200
           done
 

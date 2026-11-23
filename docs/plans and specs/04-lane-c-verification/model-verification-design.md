@@ -171,6 +171,92 @@ board would receive. Lane D's packet encoder is then tested against the actual R
 CI before hardware exists — which is how the week-3 bring-up becomes a wiring exercise rather
 than a protocol debugging session.
 
+### 5.2 Full-array L0 harness (`model/cosim/run_l0_array`)
+
+Verilates `mac_array` (all 64 lanes and the drain chain) and runs it in lockstep with
+`ModelExact::step()`. The harness plays `control_fsm` and `act_buffer`: it drives
+`seq_cnt`, `acc_clear`, `acc_en` and `shift_en` from `ModelExact::ctrl()` before each edge,
+and drives `act_bcast` itself from the rows it issued, two edges later, with junk on every
+other cycle. Every cycle it compares `w_n`, `prod` and `acc` for all 64 lanes, reading them
+through Verilator's `--public-flat-rw` scope table, so the RTL needs no probe ports. Every
+COMPUTE it checks the drained results three ways: RTL == `model_exact` == `model_ideal`.
+
+It proves the array, lane decode, both passes and the drain order. It does **not** test
+the `control_fsm` or `act_buffer` RTL; that is C5. Usage, runtime and the mutation results
+are in `model/cosim/README.md`.
+
+### 5.3 Cycle-model conventions
+
+`step()` mirrors each block as its RTL or spec stands on 23 Nov 2026. Where the RTL is still
+a skeleton, the model follows the spec, and each choice below is an **assumption for the
+block owner to confirm or change**. If one changes, the model changes in one place, and
+the C3 equivalence tests will show whether `compute()` must follow.
+
+**From RTL (mirrored line by line):**
+
+- `control_fsm` (Zhiting's A1, branch `Zhiting` at `6133069`):
+  - `CYCLE_CNT` counts the CLEAR, ACC and DRAIN cycles, not the IDLE start edge and not
+    DONE. That gives `passes × (1 + rows + LANE_PIPE_DEPTH + NUM_LANES)`, which is 392 for
+    the full tile.
+  - `busy` drops on the edge into DONE, after the last result has been written.
+  - `TILE_CFG` rows or columns of 0, or more than the tile, mean the full tile.
+  - The drain shifts on the same edge as the first write: lane 0's own value is written in
+    DRAIN cycle 0, then lane 1's value, already shifted in, in cycle 1.
+  - Soft reset (`CTRL[0]`) returns only the sequencer to IDLE and clears `CYCLE_CNT`.
+    Registers, memories, LFSRs, lanes and results are kept.
+  - Because the lanes' valid pipeline is not reset, rows in flight still retire for up to
+    3 cycles, so a COMPUTE started within 3 cycles of a soft reset would absorb them.
+    Over UART that cannot happen.
+- `config_regs` (Zhiting's A2):
+  - Writes of `QUANT_LEVELS` outside 2–255 or `ADC_BITS` outside 4–24 are silently
+    ignored and return `ST_OK`.
+  - Fields are masked to their widths.
+  - `CTRL` reads as 0.
+- `mac_lane` and `mac_array` (Megan):
+  - Pipeline: N issue → N+1 `w_rd` → N+2 `w_align`, `w_n`, then `prod` on `v2` → N+3
+    `acc` on `v3`.
+  - The M9K is read every cycle at `seq_cnt`, so the probes follow the memory even when
+    idle.
+  - `prod` has no reset and holds its value outside `v2`.
+  - Priority is clear > accumulate > shift, and the tail of the drain chain is 0.
+  - `LANE_PIPE_DEPTH` appears once in `step()`, behind a `static_assert`. The A7
+    fallback, a depth of 4, changes that one spot.
+
+**From spec (RTL still a skeleton):**
+
+- `read_noise` (B4):
+  - The LFSR advances on `acc_en` only.
+  - `noise_q` is a register updated **every cycle** from the current LFSR state, so row
+    r's sample, from the state after r's step, is in `noise_q` in N+2.
+  - `w_n = w_align + (NOISE_EN.read ? noise_q : 0)`.
+  - If the RTL gates `noise_q` with `v1`, only `w_n` outside valid cycles differs; results
+    do not.
+- `act_buffer` (B5):
+  - The M9K is read at `seq_cnt[ROW_AW-1:0]` every cycle (N → N+1).
+  - IR is applied between the M9K output and the broadcast register, using the
+    coefficient of that same row (mac-array-spec §8).
+  - `act_bcast` is valid in N+2.
+- Result buffer and argmax (B6):
+  - The result buffer is written on `drain_we` at `drain_addr` with the post-ADC
+    `chain_out`. Every drained column is stored, including those beyond `ACTIVE_COLS`.
+  - Argmax is reset on `run_start`, the first CLEAR cycle, and masks columns at or beyond
+    `ACTIVE_COLS`. Strict `>` keeps the lowest index on a tie.
+  - The runner-up is the largest value left after removing one instance of the maximum,
+    so a tie gives `second_val == max_val`.
+  - `second_val` is `INT32_MIN` when only one column is active.
+  - `results_valid` is cleared on `run_start` and by `CTRL[1]`. `CTRL[1]` does **not**
+    zero the data, so a retried `READ_RESULT` stays safe.
+  - `results_valid` is set and `result_seq` incremented on the `compute_done` pulse, so
+    both show in STATUS from the cycle after DONE.
+- STATUS:
+  - `last_err` (`[5]`) is 0 in the model, which has no UART. Mask it in hardware
+    comparisons (C8).
+  - **`config_regs` currently wires `result_seq` (`[15:8]`) to 0** for lack of a port.
+    The model implements the spec value.
+- Register writes, including the `CTRL` strobes, take effect between two `step()` calls.
+  In RTL they act one cycle later. That only matters to a harness driving the register
+  bus cycle by cycle (C5).
+
 ---
 
 ## 6. Coverage without coverage tools
