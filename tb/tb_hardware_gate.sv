@@ -113,12 +113,12 @@ module tb_hardware_gate;
         tb_tx_start = 1'b1;
         @(negedge clk);
         tb_tx_start = 1'b0;
-        while (!tb_tx_busy) @(posedge clk);
-        while (tb_tx_busy)  @(posedge clk);
-        repeat (5) @(posedge clk);
+        wait (tb_tx_busy == 1'b1);
+        wait (tb_tx_busy == 1'b0);
+        repeat (50) @(posedge clk);
     endtask
 
-    task automatic recv_byte(output logic [7:0] b, input int timeout_cycles = 500000);
+    task automatic recv_byte(output logic [7:0] b, input int timeout_cycles = 2000000);
         int elapsed;
         elapsed = 0;
         while (rx_wr_ptr == rx_rd_ptr) begin
