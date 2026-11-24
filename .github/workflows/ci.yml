@@ -89,6 +89,17 @@ jobs:
       - name: Lint control_fsm (standalone)
         if: ${{ !cancelled() }}
         run: verilator --lint-only -Wall --top-module control_fsm $RTL_LIBS rtl/fecim_pkg.sv rtl/control/control_fsm.sv
+      # Lane A (Zhiting): readout serializer
+      - name: Lint readout_ser (standalone)
+        if: ${{ !cancelled() }}
+        run: verilator --lint-only -Wall --top-module readout_ser $RTL_LIBS rtl/fecim_pkg.sv rtl/control/readout_ser.sv
+      # Lane B: result buffer & argmax unit
+      - name: Lint result_buffer (standalone)
+        if: ${{ !cancelled() }}
+        run: verilator --lint-only -Wall --top-module result_buffer $RTL_LIBS rtl/fecim_pkg.sv rtl/result/result_buffer.sv
+      - name: Lint argmax_unit (standalone)
+        if: ${{ !cancelled() }}
+        run: verilator --lint-only -Wall --top-module argmax_unit $RTL_LIBS rtl/fecim_pkg.sv rtl/result/argmax_unit.sv
 
 # sim - build and run every self-checking SystemVerilog testbench
 # tb/run_sims.sh is the single list of testbenches; run it locally the same way.

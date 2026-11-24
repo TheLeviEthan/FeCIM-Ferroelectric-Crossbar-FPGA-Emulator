@@ -26,6 +26,7 @@ fi
 
 PKG=rtl/fecim_pkg.sv
 UART="rtl/uart/baud_gen.sv rtl/uart/uart_rx.sv rtl/uart/uart_tx.sv"
+RTL_ALL="$PKG $UART rtl/fecim_pkg_checks.sv rtl/packet/packet_parser.sv rtl/packet/packet_tx.sv rtl/control/config_regs.sv rtl/control/control_fsm.sv rtl/control/readout_ser.sv rtl/control/display_driver.sv rtl/control/reset_sync.sv rtl/array/mac_lane.sv rtl/array/mac_array.sv rtl/array/read_noise.sv rtl/array/act_buffer.sv rtl/array/adc_quant.sv rtl/result/result_buffer.sv rtl/result/argmax_unit.sv rtl/write/write_path.sv rtl/fecim_top.sv quartus/fecim_board_top.sv"
 
 # name | sources (package first)
 declare -A SRC=(
@@ -35,9 +36,12 @@ declare -A SRC=(
   [tb_packet_tx]="$PKG rtl/packet/packet_tx.sv tb/tb_packet_tx.sv"
   [tb_mac_lane]="$PKG rtl/array/mac_lane.sv tb/sv/tb_mac_lane.sv"
   [tb_control_fsm]="$PKG rtl/control/control_fsm.sv tb/tb_control_fsm.sv"
+  [tb_argmax]="$PKG rtl/result/argmax_unit.sv tb/tb_argmax.sv"
+  [tb_readout]="$PKG rtl/packet/packet_parser.sv rtl/packet/packet_tx.sv rtl/control/readout_ser.sv rtl/result/result_buffer.sv rtl/result/argmax_unit.sv tb/tb_readout.sv"
   [tb_ab_integration]="$PKG tb/integration/lane_a_stub.sv tb/integration/lane_b_stub.sv tb/integration/tb_ab_integration.sv"
+  [tb_hardware_gate]="$RTL_ALL tb/tb_hardware_gate.sv"
 )
-ORDER=(tb_uart tb_uart_edge tb_packet_parser tb_packet_tx tb_mac_lane tb_control_fsm tb_ab_integration)
+ORDER=(tb_uart tb_uart_edge tb_packet_parser tb_packet_tx tb_mac_lane tb_control_fsm tb_argmax tb_readout tb_ab_integration tb_hardware_gate)
 [ $# -gt 0 ] && ORDER=("$@")
 
 fails=0
@@ -46,7 +50,7 @@ for tb in "${ORDER[@]}"; do
   obj="$OUT/obj_$tb"; log="$OUT/$tb.log"
   # Testbench-only lint classes are relaxed; the RTL itself is linted -Wall separately.
   # shellcheck disable=SC2086
-  if ! verilator --binary --timing -Wno-fatal -Wno-lint -Wno-style -j 0 \
+  if ! verilator --binary --timing -Wno-fatal -Wno-lint -Wno-style -j "${VERILATOR_JOBS:-4}" \
          --top-module "$tb" --Mdir "$obj" ${SRC[$tb]} > "$log.build" 2>&1; then
     printf '%-20s BUILD FAILED (see %s)\n' "$tb" "$log.build"; fails=$((fails+1)); continue
   fi
@@ -55,7 +59,7 @@ for tb in "${ORDER[@]}"; do
     printf '%-20s PASS  %s\n' "$tb" "$(grep PASS "$log" | tail -1 | sed 's/^ *//')"
   else
     printf '%-20s FAIL  (exit %d, log %s)\n' "$tb" "$rc" "$log"
-    grep -E 'FAIL|%Error|Error' "$log" | head -5 | sed 's/^/    /'
+    tail -n 30 "$log" | sed 's/^/    /'
     fails=$((fails+1))
   fi
 done

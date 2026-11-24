@@ -17,6 +17,12 @@ set_location_assignment PIN_B8 -to KEY[0]
 set_instance_assignment -name IO_STANDARD "3.3 V SCHMITT TRIGGER" -to KEY[0]
 
 # ------------------------------------------------------------
+# KEY1 - Manual Compute
+# ------------------------------------------------------------
+set_location_assignment PIN_A7 -to KEY[1]
+set_instance_assignment -name IO_STANDARD "3.3 V SCHMITT TRIGGER" -to KEY[1]
+
+# ------------------------------------------------------------
 # HEX0 - 7 Segment Display
 # Active Low
 # Currently unused by uart_fpga_top

@@ -8,6 +8,7 @@ module packet_parser
     input logic clk, rst_n,
     input logic [7:0] rx_data,
     input logic rx_valid,
+    input logic [15:0] active_cols,
     output logic bulk_we,
     output bulk_target_e bulk_target,
     output logic [15:0] bulk_addr,
@@ -29,6 +30,7 @@ module packet_parser
     output logic [15:0] resp_len,
     input logic resp_ready,
     output logic [15:0] rx_byte_cnt, err_cnt,
+    output logic [15:0] crc_err_cnt, timeout_cnt,
     output logic err_latched
 );
     pkt_state_e state;
@@ -67,9 +69,8 @@ module packet_parser
                 if (payload_len != 0) dispatch_status = ST_BAD_LEN;
             CMD_READ_RESULT: begin
                 if (payload_len != 16'd4) dispatch_status = ST_BAD_LEN;
-                else if (read_count_word == 0 || read_count_word > 16'(TILE_COLS) ||
-                         read_start_word >= 16'(TILE_COLS) ||
-                         (int'(read_start_word) + int'(read_count_word)) > TILE_COLS)
+                else if (read_count_word == 0 ||
+                         (int'(read_start_word) + int'(read_count_word)) > int'(active_cols))
                     dispatch_status = ST_ADDR_RANGE;
             end
             default: dispatch_status = ST_UNKNOWN_CMD;
@@ -108,6 +109,8 @@ module packet_parser
             resp_len <= 0;
             rx_byte_cnt <= 0;
             err_cnt <= 0;
+            crc_err_cnt <= 0;
+            timeout_cnt <= 0;
             err_latched <= 0;
             for (int i=0; i<5; i++) small_payload[i] <= 0;
         end else begin
@@ -125,6 +128,7 @@ module packet_parser
                 state != PKT_DISPATCH && timeout_count >= TIMEOUT_LIMIT-1) begin
                 state <= PKT_HUNT;
                 err_cnt <= err_cnt + 16'd1;
+                timeout_cnt <= timeout_cnt + 16'd1;
                 err_latched <= 1;
             end else begin
                 case (state)
@@ -190,6 +194,7 @@ module packet_parser
                             resp_len <= 0;
                             resp_valid <= 1;
                             err_cnt <= err_cnt + 16'd1;
+                            crc_err_cnt <= crc_err_cnt + 16'd1;
                             err_latched <= 1;
                             state <= PKT_RESPOND;
                         end else state <= PKT_DISPATCH;

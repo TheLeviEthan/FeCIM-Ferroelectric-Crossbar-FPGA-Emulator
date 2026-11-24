@@ -1,20 +1,13 @@
 //=============================================================================
-// argmax_unit.sv -- Lane B
+// argmax_unit.sv -- Lane A / Lane B seam
 //
 // Streaming argmax / runner-up over drained columns.
-// Spec: result-buffer-spec.md
+// Spec: result-buffer-spec.md §5
 //
-// SKELETON. Port list is provisional -- confirm against the spec and the
-// frozen A/B seam (top-level-spec §7.1) before implementing. Outputs are
-// tied to safe idle values so the top level elaborates and lints cleanly.
-//
-// TODO(lane b): implement, then DELETE the lint waivers below. They
-// exist only because a skeleton's inputs are unused; leaving them in place
-// after implementation hides real -Wall findings.
+// Tracks max_idx, max_val and second_val as the drain writes the result
+// buffer, over active columns only. Columns at or beyond active_cols are
+// masked out. Ties resolve to the lowest index, matching numpy.argmax.
 //=============================================================================
-
-/* verilator lint_off UNUSEDSIGNAL */
-/* verilator lint_off UNUSEDPARAM */
 
 module argmax_unit
     import fecim_pkg::*;
@@ -22,6 +15,7 @@ module argmax_unit
     input  logic                clk,
     input  logic                rst_n,
     input  logic                clear,           // run_start
+    input  logic [15:0]         active_cols,
     input  logic                in_valid,
     input  logic [COL_AW-1:0]   in_idx,
     input  logic [ACC_W-1:0]    in_val,          // signed
@@ -30,11 +24,24 @@ module argmax_unit
     output logic [ACC_W-1:0]    argmax_second
 );
 
-    assign argmax_idx    = '0;
-    assign argmax_val    = '0;
-    assign argmax_second = '0;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            argmax_idx    <= '0;
+            argmax_val    <= 32'sh8000_0000;
+            argmax_second <= 32'sh8000_0000;
+        end else if (clear) begin
+            argmax_idx    <= '0;
+            argmax_val    <= 32'sh8000_0000;
+            argmax_second <= 32'sh8000_0000;
+        end else if (in_valid && (16'(in_idx) < active_cols)) begin
+            if ($signed(in_val) > $signed(argmax_val)) begin
+                argmax_second <= argmax_val;
+                argmax_val    <= in_val;
+                argmax_idx    <= in_idx;
+            end else if ($signed(in_val) > $signed(argmax_second)) begin
+                argmax_second <= in_val;
+            end
+        end
+    end
 
 endmodule : argmax_unit
-
-/* verilator lint_on UNUSEDPARAM */
-/* verilator lint_on UNUSEDSIGNAL */
