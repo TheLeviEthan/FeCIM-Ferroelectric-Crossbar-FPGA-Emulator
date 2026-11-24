@@ -394,6 +394,7 @@ module fecim_top
         .clk           (clk),
         .rst_n         (rst_n),
         .clear         (run_start),
+        .active_cols   (active_cols),
         .in_valid      (drain_we),
         .in_idx        (drain_addr),
         .in_val        (adc_out),

@@ -213,6 +213,7 @@ module tb_readout;
         .clk           (clk),
         .rst_n         (rst_n),
         .clear         (au_clear),
+        .active_cols   (active_cols),
         .in_valid      (au_in_valid),
         .in_idx        (au_in_idx),
         .in_val        (au_in_val),
