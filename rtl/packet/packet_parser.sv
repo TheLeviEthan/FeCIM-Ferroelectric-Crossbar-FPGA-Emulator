@@ -8,7 +8,7 @@ module packet_parser
     input logic clk, rst_n,
     input logic [7:0] rx_data,
     input logic rx_valid,
-    input logic [15:0] active_cols = 16'(TILE_COLS),
+    input logic [15:0] active_cols,
     output logic bulk_we,
     output bulk_target_e bulk_target,
     output logic [15:0] bulk_addr,
