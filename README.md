@@ -76,11 +76,11 @@ As of the pre-alpha (early November 2026):
 | 9×9 multiplier packing | **Verified** in Quartus 25.1std: two signed 9×9 multiplies share one embedded multiplier block ([`quartus/reports/`](quartus/reports)) |
 | Other RTL leaves (control FSM, config, write path, array, result buffer, …) | **Skeletons.** Ports defined, outputs tied off |
 | A/B seam | Integration testbench drives Lane A and Lane B stubs through the frozen signal list; passes |
-| C++ reference model | **In progress.** Primitives (cell hash, CRC-8, LFSR, lane seeding), `model_ideal`, and `model_exact` with all six non-idealities (quantization, D2D variation, stuck-at faults, read noise, IR drop, ADC) implemented; **116/116 unit tests pass**. The cycle-level and register interfaces (`step()`, CSR access) are stubs, task C3 |
+| C++ reference model | **Done for semester 1.** Primitives (cell hash, CRC-8, LFSR, lane seeding), `model_ideal`, and `model_exact` with all six non-idealities; the cycle-accurate `step()` (sequencer, 64-lane pipeline, drain, result buffer, argmax with runner-up, `CYCLE_CNT`) and the register interface (`set_reg` / `get_reg`). `compute()` and `step()` agree on every configuration tested; **135/135 unit tests pass** |
 | Golden vectors, write path | **Done.** 6,560 cases over 35 register configurations (quant, D2D, stuck-at, combinations), plus an exhaustive `cell_hash16` table; independent Python generator cross-checked against `model_exact`, regeneration checked in CI |
 | Golden vectors, read path | **Done.** Read noise (noise table, LFSR sequences, 21 `mac_lane` cases with noise), IR drop (exhaustive multiplier checksum, 7 `act_buffer` profiles), ADC (1,330 cases), and 17 whole computes mixing all six non-idealities up to the full 128×128 tile; independent Python generator cross-checked against `model_exact`, regeneration checked in CI |
 | Golden vectors, single `mac_lane` (clean datapath) | **Done.** 261 directed and random cases, cross-checked against `model_exact`, regeneration checked in CI |
-| Verilator co-simulation | **Single-lane L0 slice done.** `model/cosim/run_l0`: Verilated `mac_lane` == `model_exact` == `model_ideal`, every cycle and every pass, lanes 0/5/63 in CI. Full-array L0 waits on the array and `ModelExact::step()` |
+| Verilator co-simulation | **Full-array L0 gate passes.** `model/cosim/run_l0_array`: Verilated `mac_array` vs `ModelExact::step()`, all 64 lanes every cycle, plus RTL == `model_exact` == `model_ideal`; 1,000 random 128×128 matrices in 12 s, short run in CI. The harness plays `control_fsm` and `act_buffer`; with the real ones driving it (`fecim_top`) is next (C5) |
 | Device calibration | **In progress.** Parameter sets extracted: `dualport_fefet_mlc` (Chatterjee et al., IEEE TED 2022) and `gf28_hkmg` (Soliman et al., Nat. Commun. 2023) |
 | Python host package | **In progress.** Packet codec (CRC-8, framing), response decoder, loopback transport, weight mapping and sweep scaffolding with tests; packaging (`pyproject.toml`) and backends not yet |
 | Quartus | Pin constraints and the DSP-packing experiment in repo; board build project script pending |
@@ -88,7 +88,7 @@ As of the pre-alpha (early November 2026):
 **Next milestones**
 
 1. **Hardware gate:** UART loopback and `IDENTIFY` response from the board at 921600 baud.
-2. **L0 co-simulation gate:** Verilated RTL and `model_exact` agree cycle for cycle on the clean datapath (single lane: done; full array: next).
+2. **L0 co-simulation gate:** Verilated RTL and `model_exact` agree cycle for cycle on the clean datapath (single lane and full array: done; through the real `control_fsm` and `act_buffer`: next, C5).
 3. **MVP demo:** 64×64 tile, 32 lanes, quantization + D2D + stuck-at + read noise, digit classifier running on hardware.
 4. **Semester 1 target:** full 128×128 tile with all six non-idealities, calibrated against at least one published parameter set.
 5. **Semester 2:** multi-tile support, differential-pair modelling, retention drift, and a cross-process comparison across three published FeFET datasets.
@@ -147,12 +147,13 @@ tb/run_sims.sh                 # all self-checking testbenches
 tb/run_sims.sh tb_mac_lane     # or just one
 ```
 
-**L0 co-simulation** (Verilated `mac_lane` against the C++ model):
+**L0 co-simulation** (Verilated `mac_array` and `mac_lane` against the C++ model):
 
 ```bash
-make -C model/cosim            # builds model/cosim/run_l0
-./model/cosim/run_l0           # optional args: [seed] [n_random]
-make -C model/cosim clean && make -C model/cosim LANE_ID=63   # another lane
+make -C model/cosim                    # builds run_l0 and run_l0_array
+./model/cosim/run_l0_array 1 1000      # full-array L0 gate: [seed] [n] [rows] [cols]
+./model/cosim/run_l0                   # single lane: [seed] [n_random]
+make -C model/cosim clean && make -C model/cosim run_l0 LANE_ID=63   # another lane
 ```
 
 CI runs all of the above on every push and pull request. Known gaps: the full-design lint step fails until `mac_array` matches `mac_lane`'s ports, the `mac_array`/`packet_parser`/`packet_tx` standalone lint steps are non-blocking until their `-Wall` fixes land, `tb_uart_edge` is left out of the CI sim list until it builds, and the Python test job is skipped (green, with a notice) until `sw/pyproject.toml` exists.

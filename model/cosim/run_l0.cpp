@@ -12,9 +12,10 @@
 //      the lane's column, and model_exact must equal model_ideal (the
 //      mathematical oracle, different weight layout). Three-way agreement.
 //
-// Scope (pre-alpha): one lane, clean datapath. The full L0 gate is the whole
-// array against ModelExact::step() once the cycle-level model lands; this
-// harness is written so that swap only replaces Mirror below.
+// Scope: one lane, clean datapath. The full L0 gate is run_l0_array.cpp (the
+// whole mac_array against ModelExact::step()). This single-lane harness stays
+// for what a real sequencer never produces: idle gaps between rows, and
+// clear / accumulate / shift collisions.
 //
 // Stimulus follows tb/golden/mac_lane/README.md "Running a case": weights by
 // global address (col * TILE_ROWS + row), acc_clear for one cycle, rows issued
@@ -61,7 +62,8 @@ int lane_col(int pass) { return pass * NUM_LANES + kLane; }
 }
 
 // Cycle-level expectation for one lane's accumulator, built only from model
-// values. Replaced by ModelExact::step()/lane() when the cycle model exists.
+// values. (The idle gaps and collisions below are outside what the
+// sequencer in ModelExact::step() generates, so this keeps its own mirror.)
 //
 // Accumulator update on each edge, with the RTL's priority
 // (mac-array-spec, mac_lane.sv): clear > accumulate > shift.

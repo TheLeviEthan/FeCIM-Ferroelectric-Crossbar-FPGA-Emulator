@@ -44,7 +44,7 @@ add_executable(model_tests
     tests/test_read_path.cpp
     tests/test_model_ideal.cpp
     tests/test_model.cpp
-    tests/test_model_exact_stub.cpp
+    tests/test_model_step.cpp
     tests/test_mac_lane_vectors.cpp
     tests/test_write_path_vectors.cpp
     tests/test_read_path_vectors.cpp

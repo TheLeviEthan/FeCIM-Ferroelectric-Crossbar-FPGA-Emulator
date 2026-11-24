@@ -45,9 +45,17 @@ constexpr int clog2(std::int64_t v) {
 }
 inline constexpr int ACC_USED_W      = clog2(ACC_MAX_MAG) + 1;   // 24 at 128 rows
 
+// ---- address widths (fecim_pkg.sv) ---------------------------------------
+inline constexpr int ROW_AW          = clog2(TILE_ROWS);          // 7
+inline constexpr int COL_AW          = clog2(TILE_COLS);          // 7
+inline constexpr int LANE_AW         = clog2(NUM_LANES);          // 6
+inline constexpr int SEQ_AW          = ROW_AW + clog2(PASSES);    // 8: seq_cnt = {pass, row}
+
 inline constexpr int LANE_PIPE_DEPTH = 3;
 
 // ---- host interface -------------------------------------------------------
+inline constexpr int           BAUD_ACC_W      = 16;
+inline constexpr std::uint16_t BAUD_INC_115200 = 2416;   // BAUD_INC reset value
 inline constexpr std::uint8_t SYNC_H2F = 0xA5;
 inline constexpr std::uint8_t SYNC_F2H = 0x5A;
 inline constexpr std::uint8_t CRC_POLY = 0x07;
