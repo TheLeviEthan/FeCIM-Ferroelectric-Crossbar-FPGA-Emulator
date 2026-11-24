@@ -36,10 +36,11 @@ declare -A SRC=(
   [tb_packet_tx]="$PKG rtl/packet/packet_tx.sv tb/tb_packet_tx.sv"
   [tb_mac_lane]="$PKG rtl/array/mac_lane.sv tb/sv/tb_mac_lane.sv"
   [tb_control_fsm]="$PKG rtl/control/control_fsm.sv tb/tb_control_fsm.sv"
+  [tb_readout]="$PKG rtl/packet/packet_parser.sv rtl/packet/packet_tx.sv rtl/control/readout_ser.sv rtl/result/result_buffer.sv rtl/result/argmax_unit.sv tb/tb_readout.sv"
   [tb_ab_integration]="$PKG tb/integration/lane_a_stub.sv tb/integration/lane_b_stub.sv tb/integration/tb_ab_integration.sv"
   [tb_hardware_gate]="$RTL_ALL tb/tb_hardware_gate.sv"
 )
-ORDER=(tb_uart tb_uart_edge tb_packet_parser tb_packet_tx tb_mac_lane tb_control_fsm tb_ab_integration tb_hardware_gate)
+ORDER=(tb_uart tb_uart_edge tb_packet_parser tb_packet_tx tb_mac_lane tb_control_fsm tb_readout tb_ab_integration tb_hardware_gate)
 [ $# -gt 0 ] && ORDER=("$@")
 
 fails=0
@@ -48,7 +49,7 @@ for tb in "${ORDER[@]}"; do
   obj="$OUT/obj_$tb"; log="$OUT/$tb.log"
   # Testbench-only lint classes are relaxed; the RTL itself is linted -Wall separately.
   # shellcheck disable=SC2086
-  if ! verilator --binary --timing -Wno-fatal -Wno-lint -Wno-style -j 0 \
+  if ! verilator --binary --timing -Wno-fatal -Wno-lint -Wno-style -j "${VERILATOR_JOBS:-4}" \
          --top-module "$tb" --Mdir "$obj" ${SRC[$tb]} > "$log.build" 2>&1; then
     printf '%-20s BUILD FAILED (see %s)\n' "$tb" "$log.build"; fails=$((fails+1)); continue
   fi

@@ -3,18 +3,7 @@
 //
 // Result buffer (one M9K, 256x32): written by the drain, read by readout_ser.
 // Spec: result-buffer-spec.md
-//
-// SKELETON. Port list is provisional -- confirm against the spec and the
-// frozen A/B seam (top-level-spec §7.1) before implementing. Outputs are
-// tied to safe idle values so the top level elaborates and lints cleanly.
-//
-// TODO(lane b): implement, then DELETE the lint waivers below. They
-// exist only because a skeleton's inputs are unused; leaving them in place
-// after implementation hides real -Wall findings.
 //=============================================================================
-
-/* verilator lint_off UNUSEDSIGNAL */
-/* verilator lint_off UNUSEDPARAM */
 
 module result_buffer
     import fecim_pkg::*;
@@ -37,10 +26,27 @@ module result_buffer
     output logic                results_valid
 );
 
-    assign rdata         = '0;
-    assign results_valid = 1'b0;
+    localparam int MEM_DEPTH = 1 << COL_AW;
+
+    // Simple dual-port RAM
+    logic [ACC_W-1:0] mem [0:MEM_DEPTH-1];
+
+    always_ff @(posedge clk) begin
+        if (we) begin
+            mem[waddr] <= wdata;
+        end
+        rdata <= mem[raddr];
+    end
+
+    // results_valid tracking
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            results_valid <= 1'b0;
+        end else if (clear_results || run_start) begin
+            results_valid <= 1'b0;
+        end else if (compute_done) begin
+            results_valid <= 1'b1;
+        end
+    end
 
 endmodule : result_buffer
-
-/* verilator lint_on UNUSEDPARAM */
-/* verilator lint_on UNUSEDSIGNAL */

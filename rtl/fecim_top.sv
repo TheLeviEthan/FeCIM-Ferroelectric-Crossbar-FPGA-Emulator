@@ -174,6 +174,7 @@ module fecim_top
         .rst_n         (rst_n),
         .rx_data       (rx_data),
         .rx_valid      (rx_valid),
+        .active_cols   (active_cols),
         .bulk_we       (bulk_we),
         .bulk_target   (bulk_target),
         .bulk_addr     (bulk_addr),

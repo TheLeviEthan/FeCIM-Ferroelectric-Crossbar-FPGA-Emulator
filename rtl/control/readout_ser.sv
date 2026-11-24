@@ -52,9 +52,9 @@ module readout_ser
     input  logic                rd_next
 );
 
-    // Suppress unused signal warnings for rd_go/rd_argmax which are superseded by resp_cmd
+    // Suppress unused signal warnings for resp_len
     logic unused_inputs;
-    assign unused_inputs = &{1'b0, rd_go, rd_argmax, resp_len, 1'b0};
+    assign unused_inputs = &{1'b0, resp_len, 1'b0};
 
     typedef enum logic [1:0] {
         RO_IDLE,
@@ -77,6 +77,22 @@ module readout_ser
 
     assign result_raddr = cur_col;
 
+    logic       start_tx;
+    logic [7:0] trig_cmd;
+
+    always_comb begin
+        if (resp_valid && resp_ready && (resp_status == ST_OK)) begin
+            start_tx = 1'b1;
+            trig_cmd = resp_cmd;
+        end else if (rd_go) begin
+            start_tx = 1'b1;
+            trig_cmd = rd_argmax ? CMD_READ_ARGMAX : CMD_READ_RESULT;
+        end else begin
+            start_tx = 1'b0;
+            trig_cmd = 8'h00;
+        end
+    end
+
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             state        <= RO_IDLE;
@@ -92,8 +108,8 @@ module readout_ser
             rd_valid <= 1'b0;
 
             // Start of a new response transmission
-            if (resp_valid && resp_ready && resp_status == ST_OK) begin
-                case (resp_cmd)
+            if (start_tx) begin
+                case (trig_cmd)
                     CMD_IDENTIFY: begin
                         buf_data[0]  <= MAGIC[7:0];
                         buf_data[1]  <= MAGIC[15:8];
@@ -146,7 +162,7 @@ module readout_ser
                         cur_col      <= rd_start;
                         words_left   <= rd_count;
                         byte_in_word <= 2'd0;
-                        state        <= RO_RESULT;
+                        state        <= (rd_count == '0) ? RO_IDLE : RO_RESULT;
                     end
 
                     default: begin
@@ -179,7 +195,7 @@ module readout_ser
                                 rd_data    <= result_rdata[31:24];
                                 cur_col    <= cur_col + 1'b1;
                                 words_left <= words_left - 1'b1;
-                                if (words_left == 8'd1) begin
+                                if (words_left == (COL_AW+1)'(1)) begin
                                     state <= RO_IDLE;
                                 end
                             end

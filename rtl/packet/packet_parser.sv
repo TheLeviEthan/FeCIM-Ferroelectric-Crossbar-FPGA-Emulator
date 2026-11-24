@@ -8,6 +8,7 @@ module packet_parser
     input logic clk, rst_n,
     input logic [7:0] rx_data,
     input logic rx_valid,
+    input logic [15:0] active_cols = 16'(TILE_COLS),
     output logic bulk_we,
     output bulk_target_e bulk_target,
     output logic [15:0] bulk_addr,
@@ -68,9 +69,8 @@ module packet_parser
                 if (payload_len != 0) dispatch_status = ST_BAD_LEN;
             CMD_READ_RESULT: begin
                 if (payload_len != 16'd4) dispatch_status = ST_BAD_LEN;
-                else if (read_count_word == 0 || read_count_word > 16'(TILE_COLS) ||
-                         read_start_word >= 16'(TILE_COLS) ||
-                         (int'(read_start_word) + int'(read_count_word)) > TILE_COLS)
+                else if (read_count_word == 0 ||
+                         (int'(read_start_word) + int'(read_count_word)) > int'(active_cols))
                     dispatch_status = ST_ADDR_RANGE;
             end
             default: dispatch_status = ST_UNKNOWN_CMD;
