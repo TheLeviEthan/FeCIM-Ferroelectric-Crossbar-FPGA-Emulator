@@ -30,3 +30,53 @@ Read the weight-mapping and ADC-quantization sections. They sweep ADC precision 
 bits across 1-, 2-, and 4-bit cells.
 Extract: sweep methodology and result presentation — a useful template for our own
 harness, and a baseline to compare our accuracy curves against. Open access.
+
+$FeCIMRoot = "C:\Users\Owner\CLionProjects\FeCIM-Ferroelectric-Crossbar-FPGA-Emulator"
+$FeCIMVenv = Join-Path $FeCIMRoot ".venv"
+$FeCIMActivate = Join-Path $FeCIMVenv "Scripts\Activate.ps1"
+
+function Test-InFeCIM {
+    $currentPath = (Get-Location).Path.TrimEnd('\')
+    $rootPath = $FeCIMRoot.TrimEnd('\')
+    return ($currentPath -ieq $rootPath) -or ($currentPath.StartsWith($rootPath + "\", [System.StringComparison]::OrdinalIgnoreCase))
+}
+
+function Set-CleanFeCIMPrompt {
+    param([bool]$ShowVenv)
+
+    $script:FeCIMShowVenvPrefix = $ShowVenv
+    Set-Item -Path Function:\global:prompt -Value {
+        Update-FeCIMVenv
+        $prefix = if ($script:FeCIMShowVenvPrefix) { "(.venv) " } else { "" }
+        $loc = $executionContext.SessionState.Path.CurrentLocation
+        $lvl = '>' * ($nestedPromptLevel + 1)
+        "${prefix}PS ${loc}${lvl} "
+    }
+}
+
+function Update-FeCIMVenv {
+    $inFeCIM = Test-InFeCIM
+    $venvActive = -not [string]::IsNullOrEmpty($env:VIRTUAL_ENV)
+    $isFeCIMVenv = $venvActive -and ($env:VIRTUAL_ENV.TrimEnd('\') -ieq $FeCIMVenv.TrimEnd('\'))
+
+    if ($inFeCIM -and -not $isFeCIMVenv) {
+        if (Test-Path $FeCIMActivate) {
+            Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
+            & $FeCIMActivate
+            Set-CleanFeCIMPrompt -ShowVenv $true
+        }
+    }
+    elseif (-not $inFeCIM -and $venvActive) {
+        if (Get-Command deactivate -ErrorAction SilentlyContinue) {
+            deactivate
+        }
+        Remove-Item Env:VIRTUAL_ENV -ErrorAction SilentlyContinue
+        Remove-Item Env:VIRTUAL_ENV_PROMPT -ErrorAction SilentlyContinue
+        Set-CleanFeCIMPrompt -ShowVenv $false
+    }
+    else {
+        Set-CleanFeCIMPrompt -ShowVenv ($inFeCIM -and $isFeCIMVenv)
+    }
+}
+
+Update-FeCIMVenv
